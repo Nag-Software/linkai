@@ -6,10 +6,10 @@ import { ArtistSidebar } from '@/components/artist/artist-sidebar'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { visibleArtistPath } from '@/lib/artist-portal'
 
-export const metadata = { title: 'Artistportal — LinkAI' }
+export const metadata = { title: 'Artistportal — humor.events' }
 
 export default async function ArtistLayout({ children }: { children: React.ReactNode }) {
-  const pathname = (await headers()).get('x-linkai-pathname') ?? ''
+  const pathname = (await headers()).get('x-humor-pathname') ?? ''
   const isPublicRoute = pathname.startsWith('/artist-app/login') || pathname.startsWith('/artist-app/signup')
 
   if (isPublicRoute) return children

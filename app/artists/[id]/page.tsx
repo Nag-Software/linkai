@@ -14,15 +14,15 @@ type Props = {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params
   const artist = await getPublicArtistById(id)
-  if (!artist) return { title: 'Artist ikke funnet — LinkAI Live' }
+  if (!artist) return { title: 'Artist ikke funnet — humor.events' }
   const name = artistDisplayName(artist)
 
   return {
-    title: `${name} — LinkAI Live`,
-    description: artist.bio ?? `${name} i LinkAI-lineupen.`,
+    title: `${name} — humor.events`,
+    description: artist.bio ?? `${name} i humor.events-lineupen.`,
     openGraph: {
       title: name,
-      description: artist.bio ?? `${name} i LinkAI-lineupen.`,
+      description: artist.bio ?? `${name} i humor.events-lineupen.`,
       images: artist.profile_image_url ? [{ url: artist.profile_image_url, alt: name }] : undefined,
     },
   }
@@ -89,7 +89,7 @@ export default async function ArtistDetailPage({ params }: Props) {
                       <Image src={show.poster_url} alt={show.title} fill className="object-cover transition-transform duration-500 group-hover:scale-105" />
                     ) : (
                       <div className="flex h-full flex-col justify-between bg-[linear-gradient(135deg,#111827_0%,#be123c_58%,#f59e0b_118%)] p-4">
-                        <span className="w-fit rounded-full bg-white/15 px-3 py-1 text-xs uppercase tracking-wide">LinkAI Live</span>
+                        <span className="w-fit rounded-full bg-white/15 px-3 py-1 text-xs uppercase tracking-wide">humor.events</span>
                         <strong className="text-2xl leading-none">{show.title}</strong>
                       </div>
                     )}

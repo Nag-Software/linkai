@@ -10,7 +10,7 @@ export default async function AdminLoginPage({
 }) {
   const { error } = await searchParams
   const headerStore = await headers()
-  const hostname = headerStore.get('x-linkai-hostname') ?? headerStore.get('host')?.split(':')[0] ?? ''
+  const hostname = headerStore.get('x-humor-hostname') ?? headerStore.get('host')?.split(':')[0] ?? ''
   const adminPrefix = hostname === 'admin.localhost' || hostname.startsWith('admin.') ? '' : '/admin-app'
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

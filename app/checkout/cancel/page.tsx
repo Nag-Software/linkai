@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
-export const metadata = { title: 'Betaling avbrutt — LinkAI Live' }
+export const metadata = { title: 'Betaling avbrutt — humor.events' }
 
 export default async function CheckoutCancelPage({
   searchParams,

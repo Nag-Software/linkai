@@ -5,12 +5,12 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { AdminSidebar } from '@/components/admin/admin-sidebar'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 
-export const metadata = { title: 'Booking-center — LinkAI' }
+export const metadata = { title: 'Booking-center — humor.events' }
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const headerStore = await headers()
-  const pathname = headerStore.get('x-linkai-pathname') ?? ''
-  const hostname = headerStore.get('x-linkai-hostname') ?? headerStore.get('host')?.split(':')[0] ?? ''
+  const pathname = headerStore.get('x-humor-pathname') ?? ''
+  const hostname = headerStore.get('x-humor-hostname') ?? headerStore.get('host')?.split(':')[0] ?? ''
   const adminPrefix = hostname === 'admin.localhost' || hostname.startsWith('admin.') ? '' : '/admin-app'
 
   if (pathname.startsWith('/admin-app/login')) {
@@ -32,7 +32,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     .single()
 
   const sidebarUser = {
-    email: profile?.email ?? user.email ?? 'admin@linkai.local',
+    email: profile?.email ?? user.email ?? 'admin@humor.events',
     name: profile?.full_name ?? profile?.email ?? user.email ?? 'Admin',
     role: profile?.role ?? 'admin',
   }

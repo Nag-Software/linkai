@@ -5,8 +5,8 @@ import { PublicEventCard } from '@/components/public/public-event-card'
 import { getUpcomingPublishedShows, remainingTickets } from '@/lib/public-events'
 
 export const metadata = {
-  title: 'Events — LinkAI Live',
-  description: 'Alle publiserte kommende LinkAI-show med plakater, pris og billetter.',
+  title: 'Events — humor.events',
+  description: 'Alle publiserte kommende humor.events-show med plakater, pris og billetter.',
 }
 
 export const dynamic = 'force-dynamic'

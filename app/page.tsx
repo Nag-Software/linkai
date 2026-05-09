@@ -5,8 +5,8 @@ import { PublicEventCard } from '@/components/public/public-event-card'
 import { formatShortDate, formatShowDate, formatShowTime, getUpcomingPublishedShows, remainingTickets } from '@/lib/public-events'
 
 export const metadata = {
-  title: 'LinkAI Live — kommende show',
-  description: 'Se kommende show og kjøp billetter til LinkAI-arrangementer.',
+  title: 'humor.events — kommende show',
+  description: 'Se kommende show og kjøp billetter til humor.events-arrangementer.',
 }
 
 export const dynamic = 'force-dynamic'
@@ -95,6 +95,10 @@ export default async function Page() {
           <Button asChild size="lg"><Link href="/events"><Ticket className="size-4" /> Kjøp billetter</Link></Button>
         </div>
       </section>
+
+      <footer className="border-t bg-zinc-950 py-6 text-center text-sm text-white/40">
+        <span className="font-medium tracking-tight text-white/60">humor.events</span>™
+      </footer>
     </main>
   )
 }

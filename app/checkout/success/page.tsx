@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { stripe } from '@/lib/stripe'
 import { finalizeCheckoutSession } from '@/lib/checkout/finalize'
 
-export const metadata = { title: 'Takk for kjøpet — LinkAI Live' }
+export const metadata = { title: 'Takk for kjøpet — humor.events' }
 
 export default async function CheckoutSuccessPage({
   searchParams,
@@ -31,7 +31,7 @@ export default async function CheckoutSuccessPage({
         </p>
         {session && (
           <div className="mt-6 grid gap-2 rounded-lg bg-muted p-4 text-left text-sm">
-            <div><span className="text-muted-foreground">Show:</span> {session.metadata?.show_title ?? 'LinkAI Live'}</div>
+            <div><span className="text-muted-foreground">Show:</span> {session.metadata?.show_title ?? 'humor.events'}</div>
             {session.metadata?.show_date && <div><span className="text-muted-foreground">Dato:</span> {session.metadata.show_date}</div>}
             <div><span className="text-muted-foreground">E-post:</span> {session.customer_details?.email ?? session.customer_email ?? 'Ikke tilgjengelig'}</div>
             {completion?.ticketCode && <div><span className="text-muted-foreground">Billettkode:</span> <span className="font-mono">{completion.ticketCode}</span></div>}

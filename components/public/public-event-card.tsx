@@ -18,10 +18,10 @@ export function PublicEventCard({ show, priority = false }: { show: PublicShow; 
       <Link href={`/events/${show.slug}`} className="group block">
         <div className="relative aspect-[4/5] bg-zinc-950 text-white">
           {show.poster_url ? (
-            <Image src={show.poster_url} alt={show.title} fill priority={priority} className="object-cover transition-transform duration-500 group-hover:scale-105" />
+            <Image src={show.poster_url} alt={show.title} fill priority={priority} className="object-fit transition-transform duration-500 group-hover:scale-101" />
           ) : (
             <div className="flex h-full flex-col justify-between bg-[linear-gradient(135deg,#111827_0%,#be123c_58%,#f59e0b_118%)] p-5">
-              <span className="w-fit rounded-full bg-white/15 px-3 py-1 text-xs uppercase tracking-wide">LinkAI Live</span>
+              <span className="w-fit rounded-full bg-white/15 px-3 py-1 text-xs uppercase tracking-wide">humor.events</span>
               <strong className="max-w-[13rem] text-3xl leading-none">{show.title}</strong>
             </div>
           )}

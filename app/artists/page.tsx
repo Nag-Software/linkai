@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button'
 import { artistDisplayName, artistInitials, getPublicArtists } from '@/lib/public-artists'
 
 export const metadata = {
-  title: 'Artister — LinkAI Live',
-  description: 'Se godkjente komikere og artister i LinkAI-lineupen.',
+  title: 'Artister — humor.events',
+  description: 'Se godkjente komikere og artister i humor.events-lineupen.',
 }
 
 export const dynamic = 'force-dynamic'
@@ -25,7 +25,7 @@ export default async function ArtistsPage() {
           <Button asChild variant="ghost" className="mb-6 px-0 text-white hover:bg-white/10 hover:text-white"><Link href="/"><ArrowLeft className="size-4" /> Forsiden</Link></Button>
           <div className="grid gap-8 md:grid-cols-[1fr_390px] md:items-end">
             <div className="max-w-2xl">
-              <div className="mb-4 flex w-fit items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-sm text-white/75 ring-1 ring-white/15"><Mic2 className="size-4" /> LinkAI lineup</div>
+              <div className="mb-4 flex w-fit items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-sm text-white/75 ring-1 ring-white/15"><Mic2 className="size-4" /> humor.events lineup</div>
               <h1 className="text-4xl font-semibold leading-tight md:text-6xl">Komikere og artister</h1>
             </div>
             <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-white/15 bg-white/10 text-sm backdrop-blur">

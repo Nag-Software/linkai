@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function POST(request: Request) {
   const origin = `${request.headers.get('x-forwarded-proto') ?? 'http'}://${request.headers.get('host') ?? new URL(request.url).host}`
-  const hostname = request.headers.get('x-linkai-hostname') ?? request.headers.get('host')?.split(':')[0] ?? ''
+  const hostname = request.headers.get('x-humor-hostname') ?? request.headers.get('host')?.split(':')[0] ?? ''
   const adminPrefix = hostname === 'admin.localhost' || hostname.startsWith('admin.') ? '' : '/admin-app'
   const formData = await request.formData()
   const email = formData.get('email') as string

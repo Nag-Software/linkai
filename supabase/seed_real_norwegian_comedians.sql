@@ -29,7 +29,7 @@ with real_artists (
     (
       'Atle Antonsen',
       'Atle Antonsen',
-      'atle.antonsen@seed.linkai.test',
+      'atle.antonsen@seed.humor.test',
       'https://upload.wikimedia.org/wikipedia/commons/3/3d/Atle_Antonsen_Parkteatret_Crap_%C3%A5pp%C3%A5_Park_%28235728%29.jpg',
       'Norsk komiker, skuespiller og programleder kjent fra blant annet Team Antonsen, Ut i var hage og Kongen befaler.',
       'Standup / TV-komedie',
@@ -42,7 +42,7 @@ with real_artists (
     (
       'Bård Tufte Johansen',
       'Bård Tufte Johansen',
-      'bard.tufte.johansen@seed.linkai.test',
+      'bard.tufte.johansen@seed.humor.test',
       'https://upload.wikimedia.org/wikipedia/commons/2/2d/B%C3%A5rd_Tufte_Johansen_Parkteatret_Crap_%C3%A5pp%C3%A5_Park_cropped_%28190839%29.jpg',
       'Norsk komiker, programleder og manusforfatter med lang fartstid fra satirisk TV-komedie og sceneshow.',
       'TV-komedie / satire',
@@ -55,7 +55,7 @@ with real_artists (
     (
       'Else Kåss Furuseth',
       'Else Kåss Furuseth',
-      'else.kass.furuseth@seed.linkai.test',
+      'else.kass.furuseth@seed.humor.test',
       'https://upload.wikimedia.org/wikipedia/commons/7/70/Else_K%C3%A5ss_Furuseth_%28cropped%29.jpg',
       'Norsk komiker, programleder og scenepersonlighet kjent for varm, personlig og publikumsnaer humor.',
       'Standup / scene',
@@ -68,7 +68,7 @@ with real_artists (
     (
       'Harald Eia',
       'Harald Eia',
-      'harald.eia@seed.linkai.test',
+      'harald.eia@seed.humor.test',
       'https://upload.wikimedia.org/wikipedia/commons/3/39/Harald_Eia_%282026-03-04_bilde02%29.jpg',
       'Norsk komiker, programleder og manusforfatter kjent fra flere sentrale norske humor- og satireproduksjoner.',
       'TV-komedie / satire',
@@ -81,7 +81,7 @@ with real_artists (
     (
       'Jon Almaas',
       'Jon Almaas',
-      'jon.almaas@seed.linkai.test',
+      'jon.almaas@seed.humor.test',
       'https://upload.wikimedia.org/wikipedia/commons/e/e9/Jon_Almaas_og_Thor_Gjermund_Eriksen_-_Opening_-_NMD_2013_%288721241984%29_%28cropped%29.jpg',
       'Norsk komiker, programleder og forfatter kjent for presis, tørr humor og mange år i norsk underholdning.',
       'TV-komedie / konferansier',
@@ -94,7 +94,7 @@ with real_artists (
     (
       'Linn Skåber',
       'Linn Skåber',
-      'linn.skaber@seed.linkai.test',
+      'linn.skaber@seed.humor.test',
       'https://upload.wikimedia.org/wikipedia/commons/d/d4/Linn_Sk%C3%A5ber_-_Nordiske_Mediedager_2010_%28cropped%29.jpg',
       'Norsk komiker, skuespiller og tekstforfatter kjent fra TV, scene og karakterbasert humor.',
       'Scene / TV-komedie',
@@ -107,7 +107,7 @@ with real_artists (
     (
       'Lisa Tønne',
       'Lisa Tønne',
-      'lisa.tonne@seed.linkai.test',
+      'lisa.tonne@seed.humor.test',
       'https://upload.wikimedia.org/wikipedia/commons/6/60/DZ6_4654.jpg',
       'Norsk komiker og skuespiller med tydelig sceneenergi, karakterarbeid og bred erfaring fra TV og sceneshow.',
       'Standup / scene',
@@ -120,7 +120,7 @@ with real_artists (
     (
       'Sigrid Bonde Tusvik',
       'Sigrid Bonde Tusvik',
-      'sigrid.bonde.tusvik@seed.linkai.test',
+      'sigrid.bonde.tusvik@seed.humor.test',
       'https://upload.wikimedia.org/wikipedia/commons/6/61/Sigrid_Bonde_Tusvik_2010_%28cropped%29.jpg',
       'Norsk komiker, programleder og podkastprofil kjent for direkte, personlig og samfunnsaktuell humor.',
       'Standup / podkast',
@@ -133,7 +133,7 @@ with real_artists (
     (
       'Thomas Giertsen',
       'Thomas Giertsen',
-      'thomas.giertsen@seed.linkai.test',
+      'thomas.giertsen@seed.humor.test',
       'https://upload.wikimedia.org/wikipedia/commons/9/9d/Masterclass_med_Thomas_Giertsen._-_NMD_2014_%2814133381292%29.jpg',
       'Norsk komiker, serieskaper og produsent kjent for standup, TV-komedie og lang erfaring i norsk humorbransje.',
       'Standup / TV-komedie',
@@ -146,7 +146,7 @@ with real_artists (
     (
       'Anne-Kat. Hærland',
       'Anne-Kat. Hærland',
-      'anne-kat.haerland@seed.linkai.test',
+      'anne-kat.haerland@seed.humor.test',
       'https://upload.wikimedia.org/wikipedia/commons/5/5a/Anne-Kat._H%C3%A6rland.jpg',
       'Norsk komiker, forfatter og programleder kjent for skarp, observant og samfunnsorientert humor.',
       'Standup / satire',
@@ -159,7 +159,7 @@ with real_artists (
     (
       'Are Kalvø',
       'Are Kalvø',
-      'are.kalvo@seed.linkai.test',
+      'are.kalvo@seed.humor.test',
       'https://upload.wikimedia.org/wikipedia/commons/7/73/Are_Kalv%C3%B82_%28cropped%29.jpg',
       'Norsk komiker, forfatter og satiriker kjent for nynorsk humor, samfunnssatire og sceneforestillinger.',
       'Satire / scene',
@@ -172,7 +172,7 @@ with real_artists (
     (
       'Christian Mikkelsen',
       'Christian Mikkelsen',
-      'christian.mikkelsen@seed.linkai.test',
+      'christian.mikkelsen@seed.humor.test',
       'https://upload.wikimedia.org/wikipedia/commons/e/e5/Christian_Mikkelsen_%26_Martin_Beyer-Olsen_-_NMD_UNG_2018_%2841128280364%29_%28cropped%29.jpg',
       'Norsk komiker, skuespiller og programleder kjent for karakterhumor, improvisasjon og energiske TV-opptredener.',
       'Impro / TV-komedie',
@@ -185,7 +185,7 @@ with real_artists (
     (
       'Johan Golden',
       'Johan Golden',
-      'johan.golden@seed.linkai.test',
+      'johan.golden@seed.humor.test',
       'https://upload.wikimedia.org/wikipedia/commons/2/29/Johan-Golden_TonsOfRock-2025-2.jpg',
       'Norsk komiker, programleder og musiker kjent for radio, TV-humor og en tydelig, publikumsvennlig stil.',
       'Radio / TV-komedie',
@@ -198,7 +198,7 @@ with real_artists (
     (
       'Odd-Magnus Williamson',
       'Odd-Magnus Williamson',
-      'odd-magnus.williamson@seed.linkai.test',
+      'odd-magnus.williamson@seed.humor.test',
       'https://upload.wikimedia.org/wikipedia/commons/a/a2/Odd-Magnus_Williamson_%28211417%29.jpg',
       'Norsk komiker, skuespiller og manusforfatter kjent fra humorserier, film og scenebaserte opptredener.',
       'TV-komedie / scene',

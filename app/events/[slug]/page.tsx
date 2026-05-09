@@ -18,12 +18,12 @@ export const dynamic = 'force-dynamic'
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
   const show = await getPublishedShowBySlug(slug)
-  if (!show) return { title: 'Event ikke funnet — LinkAI Live' }
-  const description = show.description ?? `${show.title} på ${show.venue_name ?? show.venue_address ?? 'LinkAI Live'} ${formatShowDate(show.date)}.`
+  if (!show) return { title: 'Event ikke funnet — humor.events' }
+  const description = show.description ?? `${show.title} på ${show.venue_name ?? show.venue_address ?? 'humor.events'} ${formatShowDate(show.date)}.`
   const canonical = `/events/${show.slug}`
 
   return {
-    title: `${show.title} — LinkAI Live`,
+    title: `${show.title} — humor.events`,
     description,
     alternates: { canonical },
     openGraph: {
@@ -61,7 +61,7 @@ export default async function EventDetailPage({ params, searchParams }: Props) {
               <Image src={show.poster_url} alt={show.title} fill priority className="object-cover" />
             ) : (
               <div className="flex h-full flex-col justify-between bg-[linear-gradient(135deg,#111827_0%,#be123c_58%,#f59e0b_118%)] p-6">
-                <span className="w-fit rounded-full bg-white/15 px-3 py-1 text-xs uppercase tracking-wide">LinkAI Live</span>
+                <span className="w-fit rounded-full bg-white/15 px-3 py-1 text-xs uppercase tracking-wide">humor.events</span>
                 <strong className="text-5xl leading-none">{show.title}</strong>
               </div>
             )}

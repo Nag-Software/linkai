@@ -1,6 +1,6 @@
 import { SignupForm } from "@/components/signup-form"
 
-export const metadata = { title: 'Lag komikerprofil — LinkAI' }
+export const metadata = { title: 'Lag komikerprofil — humor.events' }
 
 export default async function SignupPage({
   searchParams,

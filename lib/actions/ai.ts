@@ -32,7 +32,7 @@ export async function generateShowPoster(showId: string, opts: {
 
     const dateText = formatPosterDate(opts.date)
     const timeText = opts.startTime ? `kl. ${opts.startTime.slice(0, 5)}` : ''
-    const venue = opts.venue || 'Linkai Live'
+    const venue = opts.venue || 'humor.events'
 
     const headlinerNames = headliners.map(a => a.name).join(' og ')
     const supportNames   = supporting.map(a => a.name).join(', ')
@@ -54,7 +54,7 @@ export async function generateShowPoster(showId: string, opts: {
       `- Large, golden metallic serif or display title text at the BOTTOM for the show name "${opts.title}" — this should be the biggest visual element`,
       `- Date and venue in smaller white text below the title`,
       `- A thin gold decorative rule or divider separating sections`,
-      `- Footer strip at the very bottom with "BILLETTER · LINKAI.NO" in small white text on black`,
+      `- Footer strip at the very bottom with "BILLETTER · HUMOR.EVENTS" in small white text on black`,
       `- Photographic or illustrated comedian figure(s) in the middle — posed confidently, dramatic stage lighting`,
       `- The overall feel: premium, theatrical, gold-and-black color palette`,
       `- No clipart, no cartoons — photorealistic editorial style`,

@@ -144,8 +144,8 @@ export default async function PublicBookingOfferPage({
 
         <p className="text-center text-xs text-muted-foreground">
           Spørsmål? Kontakt oss på{' '}
-          <a href="mailto:hei@linkai.no" className="underline underline-offset-2">
-            hei@linkai.no
+          <a href="mailto:hei@humor.events" className="underline underline-offset-2">
+            hei@humor.events
           </a>
         </p>
       </div>

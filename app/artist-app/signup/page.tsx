@@ -1,6 +1,6 @@
 import { SignupForm } from '@/components/signup-form'
 
-export const metadata = { title: 'Registrer artistprofil — LinkAI' }
+export const metadata = { title: 'Registrer artistprofil — humor.events' }
 
 export default async function ArtistSignupPage({
   searchParams,
