@@ -5,6 +5,7 @@ import type { Metadata } from 'next'
 import { ArrowLeft, ArrowUpRight, CalendarDays, Languages, MapPin, Mic2, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { artistDisplayName, artistInitials, getPublicArtistById, getPublicArtistShows } from '@/lib/public-artists'
+import { PublicHeader } from '@/components/public/public-header'
 import { formatShortDate, formatShowTime } from '@/lib/public-events'
 
 type Props = {
@@ -39,6 +40,7 @@ export default async function ArtistDetailPage({ params }: Props) {
 
   return (
     <main className="min-h-svh bg-background">
+      <PublicHeader />
       <section className="relative overflow-hidden border-b bg-zinc-950 text-white">
         <div className="absolute inset-0 bg-[linear-gradient(125deg,#09090b_0%,#18181b_48%,#7f1d1d_88%,#f59e0b_135%)]" />
         <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(180deg,rgba(255,255,255,0.07)_1px,transparent_1px)] bg-[size:72px_72px] opacity-20" />

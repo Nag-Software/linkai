@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { ArrowLeft, CalendarDays, MapPin, Ticket } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { PublicEventCard } from '@/components/public/public-event-card'
+import { PublicHeader } from '@/components/public/public-header'
 import { getUpcomingPublishedShows, remainingTickets } from '@/lib/public-events'
 
 export const metadata = {
@@ -19,6 +20,7 @@ export default async function EventsPage() {
 
   return (
     <main className="min-h-svh bg-background">
+      <PublicHeader />
       <section className="relative overflow-hidden border-b bg-zinc-950 text-white">
         <div className="absolute inset-0 bg-[linear-gradient(120deg,#09090b_0%,#18181b_50%,#7f1d1d_100%)]" />
         <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(180deg,rgba(255,255,255,0.07)_1px,transparent_1px)] bg-[size:64px_64px] opacity-20" />

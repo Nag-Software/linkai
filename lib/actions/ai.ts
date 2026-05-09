@@ -1,7 +1,7 @@
 'use server'
 
 import { createAdminClient } from '@/lib/supabase/admin'
-import { openai } from '@/lib/openai'
+import { getOpenAI } from '@/lib/openai'
 
 type PosterArtistInput = string | {
   name: string
@@ -60,7 +60,7 @@ export async function generateShowPoster(showId: string, opts: {
       `- No clipart, no cartoons — photorealistic editorial style`,
     ].filter(Boolean).join('\n')
 
-    const response = await openai.images.generate({
+    const response = await getOpenAI().images.generate({
       model: 'gpt-image-2',
       prompt,
       n: 1,
@@ -165,7 +165,7 @@ Basert på offentlig tilgjengelig informasjon og dataene over, gi:
 `.trim()
 
   try {
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAI().chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         { role: 'system', content: systemPrompt },
