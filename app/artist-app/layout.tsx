@@ -1,14 +1,14 @@
-import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { ArtistSidebar } from '@/components/artist/artist-sidebar'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
+import { getRequestPathname } from '@/lib/request-pathname'
 
 export const metadata = { title: 'Artistportal — humor.events' }
 
 export default async function ArtistLayout({ children }: { children: React.ReactNode }) {
-  const pathname = (await headers()).get('x-humor-pathname') ?? ''
+  const pathname = await getRequestPathname()
   const isPublicRoute = pathname.startsWith('/artist-app/login') || pathname.startsWith('/artist-app/signup')
 
   if (isPublicRoute) return children

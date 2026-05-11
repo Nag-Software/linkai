@@ -1,15 +1,14 @@
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { AdminSidebar } from '@/components/admin/admin-sidebar'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
+import { getRequestPathname } from '@/lib/request-pathname'
 
 export const metadata = { title: 'Booking-center — humor.events' }
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const headerStore = await headers()
-  const pathname = headerStore.get('x-humor-pathname') ?? ''
+  const pathname = await getRequestPathname()
   const adminPrefix = '/admin-app'
 
   if (pathname.startsWith('/admin-app/login')) {
