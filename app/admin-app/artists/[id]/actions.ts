@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { approveArtist } from '@/lib/actions/artist'
 import { runArtistAiAssessment } from '@/lib/actions/ai'
