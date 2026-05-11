@@ -1,5 +1,4 @@
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { LoginForm } from '@/components/login-form'
 
@@ -9,12 +8,10 @@ export default async function AdminLoginPage({
   searchParams: Promise<{ error?: string }>
 }) {
   const { error } = await searchParams
-  const headerStore = await headers()
-  const hostname = headerStore.get('x-humor-hostname') ?? headerStore.get('host')?.split(':')[0] ?? ''
-  const adminPrefix = hostname === 'admin.localhost' || hostname.startsWith('admin.') ? '' : '/admin-app'
+  const adminPrefix = '/admin-app'
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (user) redirect(adminPrefix || '/')
+  if (user) redirect(adminPrefix)
 
   const errorMessage = error === 'unauthorized'
     ? 'Du har ikke tilgang til admin-panelet.'

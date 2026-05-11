@@ -4,8 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function POST(request: Request) {
   const origin = `${request.headers.get('x-forwarded-proto') ?? 'http'}://${request.headers.get('host') ?? new URL(request.url).host}`
-  const hostname = request.headers.get('x-humor-hostname') ?? request.headers.get('host')?.split(':')[0] ?? ''
-  const adminPrefix = hostname === 'admin.localhost' || hostname.startsWith('admin.') ? '' : '/admin-app'
+  const adminPrefix = '/admin-app'
   const formData = await request.formData()
   const email = formData.get('email') as string
   const password = formData.get('password') as string
@@ -30,5 +29,5 @@ export async function POST(request: Request) {
     return NextResponse.redirect(new URL(`${adminPrefix}/login?error=unauthorized`, origin))
   }
 
-  return NextResponse.redirect(new URL(adminPrefix || '/', origin))
+  return NextResponse.redirect(new URL(adminPrefix, origin))
 }

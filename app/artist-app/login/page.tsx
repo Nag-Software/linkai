@@ -14,9 +14,9 @@ export default async function ArtistLoginPage({
     const db = (await import('@/lib/supabase/admin')).createAdminClient()
     const { data: artist } = await db.from('artists').select('id').eq('auth_user_id', user.id).single()
     if (!artist) {
-      redirect('/logout')
+      redirect('/artist-app/logout')
     }
-    redirect(next || '/')
+    redirect(next || '/artist-app')
   }
 
   return (
@@ -25,7 +25,7 @@ export default async function ArtistLoginPage({
         <LoginForm
           title="Artistportal"
           description="Logg inn med artistkonto"
-          action="/login/submit"
+          action="/artist-app/login/submit"
           errorMessage={error === 'invalid' ? 'Feil e-post eller passord.' : undefined}
           nextPath={next}
         />

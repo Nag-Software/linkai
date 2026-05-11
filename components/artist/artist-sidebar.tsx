@@ -32,6 +32,7 @@ const navItems = [
 
 export function ArtistSidebar({ user }: { user: { email: string; name: string; status: string } }) {
   const rawPathname = usePathname()
+  const pathPrefix = '/artist-app'
   const pathname = rawPathname.replace(/^\/artist-app/, '') || '/'
 
   return (
@@ -40,7 +41,7 @@ export function ArtistSidebar({ user }: { user: { email: string; name: string; s
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <Link href="/">
+              <Link href={pathPrefix}>
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                   <User className="size-4" />
                 </div>
@@ -59,10 +60,11 @@ export function ArtistSidebar({ user }: { user: { email: string; name: string; s
           <SidebarMenu>
             {navItems.map((item) => {
               const active = item.exact ? pathname === item.href : pathname.startsWith(item.href)
+              const href = item.href === '/' ? pathPrefix : `${pathPrefix}${item.href}`
               return (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
-                    <Link href={item.href}>
+                    <Link href={href}>
                       <item.icon />
                       <span>{item.label}</span>
                     </Link>
@@ -80,7 +82,7 @@ export function ArtistSidebar({ user }: { user: { email: string; name: string; s
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Logg ut">
-              <form action="/logout" method="post">
+              <form action="/artist-app/logout" method="post">
                 <button type="submit" className="flex w-full items-center gap-2">
                   <LogOut className="size-4" />
                   <span>Logg ut</span>

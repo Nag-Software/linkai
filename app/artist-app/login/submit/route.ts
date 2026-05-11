@@ -4,16 +4,17 @@ import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function POST(request: Request) {
   const origin = `${request.headers.get('x-forwarded-proto') ?? 'http'}://${request.headers.get('host') ?? new URL(request.url).host}`
+  const artistPrefix = '/artist-app'
   const formData = await request.formData()
   const email = String(formData.get('email') ?? '')
   const password = String(formData.get('password') ?? '')
-  const nextPath = normalizeNext(String(formData.get('next') ?? '/'))
+  const nextPath = normalizeNext(String(formData.get('next') ?? artistPrefix))
 
   const supabase = await createClient()
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error || !data.user) {
-    return NextResponse.redirect(new URL(`/login?error=invalid&next=${encodeURIComponent(nextPath)}`, origin))
+    return NextResponse.redirect(new URL(`${artistPrefix}/login?error=invalid&next=${encodeURIComponent(nextPath)}`, origin))
   }
 
   const db = createAdminClient()
@@ -25,12 +26,12 @@ export async function POST(request: Request) {
 
   if (!artist) {
     await supabase.auth.signOut()
-    return NextResponse.redirect(new URL('/signup?error=missing', origin))
+    return NextResponse.redirect(new URL(`${artistPrefix}/signup?error=missing`, origin))
   }
 
   return NextResponse.redirect(new URL(nextPath, origin))
 }
 
 function normalizeNext(value: string) {
-  return value.startsWith('/') && !value.startsWith('/artist-app') ? value : '/'
+  return value.startsWith('/artist-app') ? value : '/artist-app'
 }

@@ -77,11 +77,11 @@ export async function acceptOfferAction(formData: FormData) {
     .eq('token', token)
     .single()
 
-  if (!offer || offer.artist_id !== artist.id) redirect('/booking-offers?status=denied')
+  if (!offer || offer.artist_id !== artist.id) redirect('/artist-app/booking-offers?status=denied')
 
   const { acceptBookingOffer } = await import('@/lib/actions/booking')
   const result = await acceptBookingOffer(token)
-  redirect(`/booking-offers?status=${result.result}`)
+  redirect(`/artist-app/booking-offers?status=${result.result}`)
 }
 
 export async function declineOfferAction(formData: FormData) {
@@ -95,11 +95,11 @@ export async function declineOfferAction(formData: FormData) {
     .eq('token', token)
     .single()
 
-  if (!offer || offer.artist_id !== artist.id) redirect('/booking-offers?status=denied')
+  if (!offer || offer.artist_id !== artist.id) redirect('/artist-app/booking-offers?status=denied')
 
   const { declineBookingOffer } = await import('@/lib/actions/booking')
   await declineBookingOffer(token)
-  redirect('/booking-offers?status=declined')
+  redirect('/artist-app/booking-offers?status=declined')
 }
 
 function textValue(value: FormDataEntryValue | null) {

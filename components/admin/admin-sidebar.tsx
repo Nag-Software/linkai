@@ -49,7 +49,7 @@ interface AdminSidebarProps {
 
 export function AdminSidebar({ user }: AdminSidebarProps) {
   const rawPathname = usePathname()
-  const pathPrefix = rawPathname.startsWith('/admin-app') ? '/admin-app' : ''
+  const pathPrefix = '/admin-app'
   const pathname = rawPathname.replace(/^\/admin-app/, '') || '/'
 
   return (
@@ -58,7 +58,7 @@ export function AdminSidebar({ user }: AdminSidebarProps) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <Link href={pathPrefix || '/'}>
+              <Link href={pathPrefix}>
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                   <Music2 className="size-4" />
                 </div>
@@ -80,7 +80,7 @@ export function AdminSidebar({ user }: AdminSidebarProps) {
               const active = item.exact
                 ? pathname === item.href || pathname === '/'
                 : pathname.startsWith(item.href)
-              const href = item.href === '/' ? pathPrefix || '/' : `${pathPrefix}${item.href}`
+              const href = item.href === '/' ? pathPrefix : `${pathPrefix}${item.href}`
               return (
                 <SidebarMenuItem key={item.href + item.label}>
                   <SidebarMenuButton asChild isActive={active} tooltip={item.label}>

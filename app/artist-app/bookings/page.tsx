@@ -28,9 +28,9 @@ export default async function ConfirmedBookingsPage({
       <ArtistHeader title="Confirmed Bookings" description={`${filtered.length} bookinger`} />
       <main className="space-y-6 p-4 md:p-6">
         <div className="flex flex-wrap gap-2">
-          <Tab href="/bookings?view=upcoming" active={view === 'upcoming'}>Kommende</Tab>
-          <Tab href="/bookings?view=previous" active={view === 'previous'}>Tidligere</Tab>
-          <Tab href="/bookings?view=cancelled" active={view === 'cancelled'}>Kansellerte</Tab>
+          <Tab href="/artist-app/bookings?view=upcoming" active={view === 'upcoming'}>Kommende</Tab>
+          <Tab href="/artist-app/bookings?view=previous" active={view === 'previous'}>Tidligere</Tab>
+          <Tab href="/artist-app/bookings?view=cancelled" active={view === 'cancelled'}>Kansellerte</Tab>
         </div>
         <Card>
           <CardHeader>

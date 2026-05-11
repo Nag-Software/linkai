@@ -79,7 +79,7 @@ export default async function ArtistDashboardPage() {
             <CardContent className="space-y-3">
               {availability.map((item) => <div key={item.id} className="rounded-lg border p-3 font-medium">{formatDate(item.available_date)}</div>)}
               {availability.length === 0 && <EmptyLine text="Ingen prioriterte datoer valgt." />}
-              <Button asChild variant="outline" className="w-full"><Link href="/available-dates">Administrer datoer</Link></Button>
+              <Button asChild variant="outline" className="w-full"><Link href="/artist-app/available-dates">Administrer datoer</Link></Button>
             </CardContent>
           </Card>
         </section>
@@ -105,7 +105,7 @@ export default async function ArtistDashboardPage() {
                   </div>
                 )
               })}
-              <Button asChild variant="outline" className="w-full"><Link href="/bookings">Alle bookinger</Link></Button>
+              <Button asChild variant="outline" className="w-full"><Link href="/artist-app/bookings">Alle bookinger</Link></Button>
             </CardContent>
           </Card>
         </section>
@@ -123,8 +123,8 @@ function ArtistAuthLanding() {
           <CardDescription>Logg inn eller registrer artistprofil for å komme i gang.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2">
-          <Button asChild><Link href="/login">Logg inn</Link></Button>
-          <Button asChild variant="outline"><Link href="/signup">Registrer profil</Link></Button>
+          <Button asChild><Link href="/artist-app/login">Logg inn</Link></Button>
+          <Button asChild variant="outline"><Link href="/artist-app/signup">Registrer profil</Link></Button>
         </CardContent>
       </Card>
     </main>

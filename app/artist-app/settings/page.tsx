@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
 
 export default async function ArtistSettingsPage() {
-  redirect('/profile')
+  redirect('/artist-app/profile')
 }

@@ -4,7 +4,6 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { ArtistSidebar } from '@/components/artist/artist-sidebar'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
-import { visibleArtistPath } from '@/lib/artist-portal'
 
 export const metadata = { title: 'Artistportal — humor.events' }
 
@@ -19,7 +18,7 @@ export default async function ArtistLayout({ children }: { children: React.React
 
   if (!user) {
     if (pathname === '/artist-app' || pathname === '/artist-app/') return children
-    redirect(`/login?next=${encodeURIComponent(visibleArtistPath(pathname))}`)
+    redirect(`/artist-app/login?next=${encodeURIComponent(pathname)}`)
   }
 
   const db = createAdminClient()
@@ -29,7 +28,7 @@ export default async function ArtistLayout({ children }: { children: React.React
     .eq('auth_user_id', user.id)
     .single()
 
-  if (!artist) redirect('/signup?error=missing')
+  if (!artist) redirect('/artist-app/signup?error=missing')
 
   return (
     <SidebarProvider>

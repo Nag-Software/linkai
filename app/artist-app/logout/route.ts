@@ -5,7 +5,7 @@ async function signOutAndRedirect(request: Request) {
   const origin = `${request.headers.get('x-forwarded-proto') ?? 'http'}://${request.headers.get('host') ?? new URL(request.url).host}`
   const supabase = await createClient()
   await supabase.auth.signOut()
-  return NextResponse.redirect(new URL('/login', origin))
+  return NextResponse.redirect(new URL('/artist-app/login', origin))
 }
 
 export async function GET(request: Request) {

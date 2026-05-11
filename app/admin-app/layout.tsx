@@ -10,8 +10,7 @@ export const metadata = { title: 'Booking-center — humor.events' }
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const headerStore = await headers()
   const pathname = headerStore.get('x-humor-pathname') ?? ''
-  const hostname = headerStore.get('x-humor-hostname') ?? headerStore.get('host')?.split(':')[0] ?? ''
-  const adminPrefix = hostname === 'admin.localhost' || hostname.startsWith('admin.') ? '' : '/admin-app'
+  const adminPrefix = '/admin-app'
 
   if (pathname.startsWith('/admin-app/login')) {
     return children

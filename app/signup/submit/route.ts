@@ -3,6 +3,8 @@ import { registerArtist } from '@/lib/actions/artist'
 
 export async function POST(request: Request) {
   const origin = `${request.headers.get('x-forwarded-proto') ?? 'http'}://${request.headers.get('host') ?? new URL(request.url).host}`
+  const pathname = new URL(request.url).pathname
+  const signupPath = pathname.startsWith('/artist-app/') ? '/artist-app/signup' : '/signup'
   const formData = await request.formData()
 
   try {
@@ -20,10 +22,10 @@ export async function POST(request: Request) {
       profile_image_file: fileOrUndefined(formData.get('profile_image_file')),
     })
 
-    return NextResponse.redirect(new URL('/signup?status=submitted', origin))
+    return NextResponse.redirect(new URL(`${signupPath}?status=submitted`, origin))
   } catch (error) {
     console.error(error)
-    return NextResponse.redirect(new URL('/signup?error=failed', origin))
+    return NextResponse.redirect(new URL(`${signupPath}?error=failed`, origin))
   }
 }
 

@@ -6,7 +6,7 @@ export async function getCurrentArtist() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) redirect('/login')
+  if (!user) redirect('/artist-app/login')
 
   const db = createAdminClient()
   const { data: artist } = await db
@@ -17,7 +17,7 @@ export async function getCurrentArtist() {
 
   if (!artist) {
     await supabase.auth.signOut()
-    redirect('/signup?error=missing')
+    redirect('/artist-app/signup?error=missing')
   }
 
   return { user, artist, db }
