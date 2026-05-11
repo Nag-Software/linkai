@@ -5,9 +5,9 @@ export default async function OrdersPage() {
   const db = createAdminClient()
   const { data: orders } = await db
     .from('orders')
-    .select('*')
+    .select('id, show_id, stripe_checkout_session_id, amount_total, currency, status, buyer_email, buyer_name, created_at')
     .order('created_at', { ascending: false })
-    .limit(500)
+    .limit(100)
 
   const showIds = [...new Set((orders ?? []).filter(o => o.show_id).map(o => o.show_id as string))]
   const { data: showRows } = showIds.length

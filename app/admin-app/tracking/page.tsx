@@ -5,9 +5,9 @@ export default async function TrackingPage() {
   const db = createAdminClient()
   const { data: events } = await db
     .from('tracking_events')
-    .select('*')
+    .select('id, show_id, event_name, event_source_url, status, sent_at')
     .order('sent_at', { ascending: false })
-    .limit(500)
+    .limit(100)
 
   const statusColors: Record<string, string> = {
     sent: 'bg-emerald-100 text-emerald-700',
@@ -28,7 +28,6 @@ export default async function TrackingPage() {
                 <th className="text-left px-4 py-2.5 font-medium">Show ID</th>
                 <th className="text-left px-4 py-2.5 font-medium">Status</th>
                 <th className="text-left px-4 py-2.5 font-medium">Source URL</th>
-                <th className="text-left px-4 py-2.5 font-medium">Payload</th>
                 <th className="text-left px-4 py-2.5 font-medium">Tidspunkt</th>
               </tr>
             </thead>
@@ -44,14 +43,6 @@ export default async function TrackingPage() {
                   </td>
                   <td className="px-4 py-3 text-xs text-muted-foreground max-w-[200px] truncate">
                     {ev.event_source_url ?? '—'}
-                  </td>
-                  <td className="px-4 py-3">
-                    <details className="cursor-pointer">
-                      <summary className="text-xs text-primary">Vis</summary>
-                      <pre className="text-xs bg-muted rounded mt-1 p-2 max-w-xs overflow-auto whitespace-pre-wrap">
-                        {ev.payload ? JSON.stringify(ev.payload, null, 2) : '—'}
-                      </pre>
-                    </details>
                   </td>
                   <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
                     {ev.sent_at ? new Date(ev.sent_at).toLocaleDateString('nb-NO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}

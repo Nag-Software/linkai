@@ -8,9 +8,9 @@ export default async function TicketsPage() {
   const db = createAdminClient()
   const { data: tickets } = await db
     .from('tickets')
-    .select('*')
+    .select('id, show_id, order_id, ticket_code, status, created_at')
     .order('created_at', { ascending: false })
-    .limit(1000)
+    .limit(250)
 
   const ticketShowIds = [...new Set((tickets ?? []).map(t => t.show_id))]
   const ticketOrderIds = [...new Set((tickets ?? []).map(t => t.order_id))]

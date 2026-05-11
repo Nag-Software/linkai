@@ -36,7 +36,7 @@ async function getDashboardData() {
     { count: pendingOffers },
     { count: approvedArtists },
     { count: soldTickets },
-    ordersResult,
+    revenueResult,
     showsResult,
     { count: draftShows },
     { count: bookingShows },
@@ -49,7 +49,7 @@ async function getDashboardData() {
     db.from('booking_offers').select('id', { count: 'exact', head: true }).eq('status', 'sent'),
     db.from('artists').select('id', { count: 'exact', head: true }).eq('status', 'approved'),
     db.from('tickets').select('id', { count: 'exact', head: true }).in('status', ['valid', 'used']),
-    db.from('orders').select('amount_total').eq('status', 'paid'),
+    db.from('orders').select('amount_total.sum()').eq('status', 'paid').single(),
     db.from('shows')
       .select('id, title, date, capacity, status, venue_address, venue_name')
       .gte('date', today)
@@ -62,7 +62,7 @@ async function getDashboardData() {
     db.from('shows').select('id', { count: 'exact', head: true }).eq('status', 'published'),
   ])
 
-  const totalRevenue = (ordersResult.data ?? []).reduce((sum, o) => sum + (o.amount_total ?? 0), 0)
+  const totalRevenue = Number((revenueResult.data as { sum?: number | null } | null)?.sum ?? 0)
   const upcomingShows = showsResult.data ?? []
   const showIds = upcomingShows.map(s => s.id)
 

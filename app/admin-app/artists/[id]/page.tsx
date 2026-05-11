@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { AdminHeader } from '@/components/admin/admin-header'
 import { ToastActionForm } from '@/components/toast-action-form'
+import { EditableArtistProfile } from '@/components/admin/editable-artist-profile'
 import {
   saveArtistAdminReview,
   approveArtistAction,
@@ -39,47 +40,8 @@ export default async function ArtistDetailPage({ params }: { params: Promise<{ i
       <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* ── Left: Profile + AI ── */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Profile card */}
-          <section className="rounded-xl border bg-card p-5 space-y-4">
-            <h2 className="font-semibold text-sm">Innsendt profil</h2>
-            <div className="flex flex-col gap-4 sm:flex-row">
-              {artist.profile_image_url && (
-                <img
-                  src={artist.profile_image_url}
-                  alt={artist.full_name}
-                  className="h-64 w-full rounded-xl object-cover sm:h-56 sm:w-44 lg:h-72 lg:w-56 shrink-0"
-                />
-              )}
-              <div className="grid grid-cols-1 gap-x-8 gap-y-2 text-sm flex-1 sm:grid-cols-2">
-                <ProfileField label="Fullt navn" value={artist.full_name} />
-                <ProfileField label="Scenenavn" value={artist.stage_name} />
-                <ProfileField label="E-post" value={artist.email} />
-                <ProfileField label="Telefon" value={artist.phone} />
-                <ProfileField label="Kategori" value={artist.category} />
-                <ProfileField label="Språk" value={artist.language} />
-                <ProfileField label="AI-samtykke" value={artist.consent_ai_research ? 'Ja' : 'Nei'} />
-              </div>
-            </div>
-            {artist.bio && (
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Bio</p>
-                <p className="text-sm whitespace-pre-wrap">{artist.bio}</p>
-              </div>
-            )}
-            {artist.social_links && Object.keys(artist.social_links).length > 0 && (
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Sosiale lenker</p>
-                <div className="flex flex-wrap gap-2">
-                  {Object.entries(artist.social_links).map(([k, v]) => (
-                    <a key={k} href={v} target="_blank" rel="noopener noreferrer"
-                      className="text-xs text-primary underline underline-offset-2">
-                      {k}
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
-          </section>
+          {/* Profile card — inline editable */}
+          <EditableArtistProfile artist={artist} />
 
           {/* AI assessment card */}
           <section className="rounded-xl border bg-card p-5 space-y-4">
@@ -280,15 +242,6 @@ export default async function ArtistDetailPage({ params }: { params: Promise<{ i
           </section>
         </div>
       </div>
-    </div>
-  )
-}
-
-function ProfileField({ label, value }: { label: string; value: string | null | undefined }) {
-  return (
-    <div>
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="font-medium">{value ?? '—'}</p>
     </div>
   )
 }

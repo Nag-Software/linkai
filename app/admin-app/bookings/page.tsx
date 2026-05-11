@@ -5,9 +5,9 @@ export default async function BookingsPage() {
   const db = createAdminClient()
   const { data: offers } = await db
     .from('booking_offers')
-    .select('*')
+    .select('id, show_id, artist_id, status, fee_amount, currency, sent_at, responded_at, expires_at, created_at')
     .order('created_at', { ascending: false })
-    .limit(500)
+    .limit(250)
 
   const artistIds = [...new Set((offers ?? []).map(o => o.artist_id))]
   const showIds = [...new Set((offers ?? []).map(o => o.show_id))]

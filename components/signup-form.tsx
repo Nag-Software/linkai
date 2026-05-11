@@ -162,7 +162,7 @@ export function SignupForm({
         </FieldGroup>
       </form>
       <FieldDescription className="px-6 text-center">
-        Allerede registrert? <a href="/login">Logg inn</a>.
+        Allerede registrert? <a href="/artist-app/login">Logg inn</a>.
       </FieldDescription>
     </div>
   )

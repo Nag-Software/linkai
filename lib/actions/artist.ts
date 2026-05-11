@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { sendArtistRegisteredEmail } from '@/lib/email/mailer'
 import { runArtistAiAssessment } from '@/lib/actions/ai'
 import { runAutomaticBookingForOpenShows } from '@/lib/actions/booking'
+import { runAfterResponse } from '@/lib/background'
 
 export interface RegisterArtistInput {
   email: string
@@ -133,16 +134,18 @@ export async function approveArtist(
 
   if ((artist.admin_score ?? 0) > 6) {
     const artistAppUrl = process.env.ARTIST_APP_URL ?? `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/artist-app`
-    await sendArtistApprovedEmail({
-      email: artist.email,
-      full_name: artist.full_name,
-      portal_url: `${artistAppUrl.replace(/\/$/, '')}/available-dates`,
-    })
+    runAfterResponse(`approve-artist-${artistId}`, async () => {
+      await sendArtistApprovedEmail({
+        email: artist.email,
+        full_name: artist.full_name,
+        portal_url: `${artistAppUrl.replace(/\/$/, '')}/available-dates`,
+      })
 
-    try {
-      await runAutomaticBookingForOpenShows()
-    } catch (bookingError) {
-      console.error('[BookingAutomation] Failed after artist approval:', bookingError)
-    }
+      try {
+        await runAutomaticBookingForOpenShows()
+      } catch (bookingError) {
+        console.error('[BookingAutomation] Failed after artist approval:', bookingError)
+      }
+    })
   }
 }

@@ -68,12 +68,20 @@ export default async function ArtistsPage({
         title="Artister"
         description={`${artists?.length ?? 0} artister`}
         actions={
-          <Link
-            href="/admin-app/artists"
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Nullstill filter
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/admin-app/artists"
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Nullstill filter
+            </Link>
+            <Link
+              href="/admin-app/artists/new"
+              className="text-xs bg-primary text-primary-foreground rounded-md px-3 py-1.5 hover:bg-primary/90 transition-colors"
+            >
+              + Ny artist
+            </Link>
+          </div>
         }
       />
       <div className="p-6 space-y-4">

@@ -6,6 +6,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createShow, updateShowStatus } from '@/lib/actions/shows'
 import { acceptBookingOfferById, automateFullbookedShow, bookShow, cancelConfirmedSpotForOffer, runAutomaticBookingForShow } from '@/lib/actions/booking'
 import { generateShowPoster } from '@/lib/actions/ai'
+import { runAfterResponse } from '@/lib/background'
 import type { BookingOfferStatus, ConfirmedSpotStatus, RequirementEnergy, ShowStatus } from '@/types/database'
 
 export type ManualSpotActionState = {
@@ -42,6 +43,24 @@ function tagsFromForm(value: FormDataEntryValue | null) {
   return tags.length > 0 ? tags : null
 }
 
+function scheduleShowAutomation(showId: string, reason: string) {
+  runAfterResponse(`show-automation-${reason}-${showId}`, async () => {
+    await runAutomaticBookingForShow(showId)
+    revalidatePath(`/admin-app/shows/${showId}`)
+    revalidatePath('/admin-app/bookings')
+    revalidatePath('/admin-app')
+  })
+}
+
+function scheduleFullbookedAutomation(showId: string, reason: string) {
+  runAfterResponse(`fullbooked-automation-${reason}-${showId}`, async () => {
+    await automateFullbookedShow(showId)
+    revalidatePath(`/admin-app/shows/${showId}`)
+    revalidatePath('/admin-app/marketing')
+    revalidatePath('/admin-app')
+  })
+}
+
 export async function createShowAction(formData: FormData) {
   const input = {
     title: formData.get('title') as string,
@@ -71,7 +90,7 @@ export async function addRequirementAction(formData: FormData) {
     energy_level: ((formData.get('energy_level') as RequirementEnergy | null) ?? 'any'),
     required_tags: tagsFromForm(formData.get('required_tags')),
   })
-  await runAutomaticBookingForShow(showId)
+  scheduleShowAutomation(showId, 'add-requirement')
   revalidatePath(`/admin-app/shows/${showId}`)
 }
 
@@ -94,7 +113,7 @@ export async function updateShowDetailsAction(formData: FormData) {
   }).eq('id', showId)
 
   if (error) throw new Error(error.message)
-  await runAutomaticBookingForShow(showId)
+  scheduleShowAutomation(showId, 'update-show')
   revalidatePath(`/admin-app/shows/${showId}`)
 }
 
@@ -112,7 +131,7 @@ export async function updateRequirementAction(formData: FormData) {
   }).eq('id', reqId)
 
   if (error) throw new Error(error.message)
-  await runAutomaticBookingForShow(showId)
+  scheduleShowAutomation(showId, 'update-requirement')
   revalidatePath(`/admin-app/shows/${showId}`)
 }
 
@@ -121,7 +140,7 @@ export async function deleteRequirementAction(formData: FormData) {
   const reqId = formData.get('req_id') as string
   const db = createAdminClient()
   await db.from('show_requirements').delete().eq('id', reqId)
-  await automateFullbookedShow(showId)
+  scheduleFullbookedAutomation(showId, 'delete-requirement')
   revalidatePath(`/admin-app/shows/${showId}`)
 }
 
@@ -253,7 +272,7 @@ export async function addManualSpotAction(_prevState: ManualSpotActionState, for
   }
 
   await db.from('shows').update({ status: 'booking' }).eq('id', showId).in('status', ['draft'])
-  await automateFullbookedShow(showId)
+  scheduleFullbookedAutomation(showId, 'manual-spot')
   revalidatePath(`/admin-app/shows/${showId}`)
   return manualSpotState('success', 'Artisten ble lagt til i lineupen.')
 }
@@ -275,12 +294,21 @@ export async function updateSpotAction(formData: FormData) {
   }).eq('id', spotId)
 
   if (error) throw new Error(error.message)
-  await automateFullbookedShow(showId)
+  scheduleFullbookedAutomation(showId, 'update-spot')
   revalidatePath(`/admin-app/shows/${showId}`)
 }
 
 export async function generatePosterAction(formData: FormData) {
   const showId = formData.get('show_id') as string
+  runAfterResponse(`generate-poster-${showId}`, async () => {
+    await generatePosterForShow(showId)
+    revalidatePath(`/admin-app/shows/${showId}`)
+    revalidatePath('/admin-app/marketing')
+  })
+  revalidatePath(`/admin-app/shows/${showId}`)
+}
+
+async function generatePosterForShow(showId: string) {
   const db = createAdminClient()
 
   const [{ data: show }, { data: spots }] = await Promise.all([
@@ -328,8 +356,6 @@ export async function generatePosterAction(formData: FormData) {
     label: 'Lineup-plakat generert',
     is_completed: true,
   }, { onConflict: 'show_id,task_key', ignoreDuplicates: false })
-
-  revalidatePath(`/admin-app/shows/${showId}`)
 }
 
 export async function completeMarketingTask(formData: FormData) {

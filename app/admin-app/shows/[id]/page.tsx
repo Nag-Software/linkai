@@ -27,6 +27,11 @@ export default async function ShowDetailPage({
   const { tab = 'overview', mode = 'auto' } = await searchParams
   const lineupMode: LineupMode = mode === 'manual' ? 'manual' : 'auto'
   const db = createAdminClient()
+  const shouldLoadTickets = tab === 'tickets'
+  const shouldLoadMarketingTasks = tab === 'marketing'
+  const shouldLoadRelatedArtists = tab === 'booking' || tab === 'lineup' || tab === 'marketing'
+  const shouldLoadLineupRequirements = tab === 'lineup'
+  const shouldLoadSelectableArtists = tab === 'lineup'
 
   const [
     { data: show },
@@ -40,8 +45,12 @@ export default async function ShowDetailPage({
     db.from('show_requirements').select('*').eq('show_id', id).order('created_at'),
     db.from('booking_offers').select('*').eq('show_id', id).order('created_at', { ascending: false }),
     db.from('confirmed_spots').select('*').eq('show_id', id),
-    db.from('tickets').select('id, ticket_code, status, customer_id').eq('show_id', id).limit(500),
-    db.from('marketing_tasks').select('*').eq('show_id', id).order('created_at'),
+    shouldLoadTickets
+      ? db.from('tickets').select('id, ticket_code, status, customer_id').eq('show_id', id).limit(500)
+      : Promise.resolve({ data: [] as Array<{ id: string; ticket_code: string; status: string; customer_id: string | null }> }),
+    shouldLoadMarketingTasks
+      ? db.from('marketing_tasks').select('*').eq('show_id', id).order('created_at')
+      : Promise.resolve({ data: [] as Array<{ id: string; show_id: string; task_key: string; label: string | null; is_completed: boolean; created_at: string }> }),
   ])
 
   if (!show) notFound()
@@ -53,17 +62,19 @@ export default async function ShowDetailPage({
   const lineupReqIds = [...new Set((lineup ?? []).map(s => s.show_requirement_id).filter((x): x is string => !!x))]
 
   const [{ data: artistRows }, { data: reqRows }, { data: selectableArtists }] = await Promise.all([
-    allArtistIds.length
+    shouldLoadRelatedArtists && allArtistIds.length
       ? db.from('artists').select('id, full_name, stage_name, email, profile_image_url, admin_score, admin_energy_level').in('id', allArtistIds)
       : Promise.resolve({ data: [] as Array<{ id: string; full_name: string; stage_name: string | null; email: string; profile_image_url: string | null; admin_score: number | null; admin_energy_level: string | null }> }),
-    lineupReqIds.length
+    shouldLoadLineupRequirements && lineupReqIds.length
       ? db.from('show_requirements').select('id, role_name').in('id', lineupReqIds)
       : Promise.resolve({ data: [] as Array<{ id: string; role_name: string }> }),
-    db.from('artists')
-      .select('id, full_name, stage_name, email, admin_score, admin_energy_level, admin_tags')
-      .eq('status', 'approved')
-      .order('full_name')
-      .limit(250),
+    shouldLoadSelectableArtists
+      ? db.from('artists')
+        .select('id, full_name, stage_name, email, admin_score, admin_energy_level, admin_tags')
+        .eq('status', 'approved')
+        .order('full_name')
+        .limit(250)
+      : Promise.resolve({ data: [] as Array<{ id: string; full_name: string; stage_name: string | null; email: string; admin_score: number | null; admin_energy_level: string | null; admin_tags: string[] | null }> }),
   ])
   const artistMap = Object.fromEntries((artistRows ?? []).map(a => [a.id, a]))
   const reqMap = Object.fromEntries((reqRows ?? []).map(r => [r.id, r]))
@@ -319,7 +330,7 @@ export default async function ShowDetailPage({
               <div className="rounded-xl border bg-card p-5 space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="font-semibold text-sm">Plakat</h2>
-                  <ToastActionForm action={generatePosterAction} successMessage="Plakaten er regenerert.">
+                  <ToastActionForm action={generatePosterAction} successMessage="Plakatgenerering er startet.">
                     <input type="hidden" name="show_id" value={show.id} />
                     <button type="submit" className="rounded-md border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted">
                       Regenerer
@@ -672,7 +683,7 @@ export default async function ShowDetailPage({
               <div className="rounded-xl border bg-card p-5 space-y-3">
                 <div className="flex items-center justify-between">
                   <h2 className="font-semibold text-sm">Lineup-plakat</h2>
-                  <ToastActionForm action={generatePosterAction} successMessage={show.poster_url ? 'Plakaten er regenerert.' : 'Plakaten er generert.'}>
+                  <ToastActionForm action={generatePosterAction} successMessage="Plakatgenerering er startet.">
                     <input type="hidden" name="show_id" value={show.id} />
                     <button type="submit" className="rounded-md border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted">
                       {show.poster_url ? 'Regenerer' : 'Generer'}

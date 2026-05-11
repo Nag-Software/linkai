@@ -5,9 +5,9 @@ export default async function EmailLogsPage() {
   const db = createAdminClient()
   const { data: logs } = await db
     .from('email_logs')
-    .select('*')
+    .select('id, recipient_email, subject, template_name, resend_email_id, status, error_message, sent_at')
     .order('sent_at', { ascending: false })
-    .limit(500)
+    .limit(100)
 
   const statusColors: Record<string, string> = {
     sent: 'bg-emerald-100 text-emerald-700',

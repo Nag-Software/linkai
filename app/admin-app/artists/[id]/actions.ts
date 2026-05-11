@@ -4,7 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { approveArtist } from '@/lib/actions/artist'
 import { runArtistAiAssessment } from '@/lib/actions/ai'
-import type { EnergyLevel, ArtistStatus } from '@/types/database'
+import { runAfterResponse } from '@/lib/background'
+import type { Artist, EnergyLevel, ArtistStatus } from '@/types/database'
 
 export async function saveArtistAdminReview(formData: FormData) {
   const artistId = formData.get('artist_id') as string
@@ -44,7 +45,16 @@ export async function rejectArtistAction(formData: FormData) {
 
 export async function rerunAiAction(formData: FormData) {
   const artistId = formData.get('artist_id') as string
-  await runArtistAiAssessment(artistId)
+  const db = createAdminClient()
+  await db.from('artist_ai_assessments').upsert({
+    artist_id: artistId,
+    ai_status: 'pending',
+    ai_last_checked_at: new Date().toISOString(),
+  }, { onConflict: 'artist_id', ignoreDuplicates: false })
+  runAfterResponse(`artist-ai-${artistId}`, async () => {
+    await runArtistAiAssessment(artistId)
+    revalidatePath(`/admin-app/artists/${artistId}`)
+  })
   revalidatePath(`/admin-app/artists/${artistId}`)
 }
 
@@ -63,5 +73,31 @@ export async function applyAiSuggestion(formData: FormData) {
       admin_tags: ai.ai_tags_suggestion,
     }).eq('id', artistId)
   }
+  revalidatePath(`/admin-app/artists/${artistId}`)
+}
+
+export async function updateArtistProfile(formData: FormData) {
+  const artistId = formData.get('artist_id') as string
+  if (!artistId) throw new Error('Mangler artist_id')
+  const db = createAdminClient()
+
+  const socialLinksRaw = formData.get('social_links') as string | null
+  let social_links: Record<string, string> | null = null
+  if (socialLinksRaw) {
+    try { social_links = JSON.parse(socialLinksRaw) } catch { social_links = null }
+  }
+
+  const update: Partial<Artist> = {}
+  if (formData.has('full_name')) update.full_name = (formData.get('full_name') as string).trim()
+  if (formData.has('stage_name')) update.stage_name = (formData.get('stage_name') as string).trim() || null
+  if (formData.has('email')) update.email = (formData.get('email') as string).trim()
+  if (formData.has('phone')) update.phone = (formData.get('phone') as string).trim() || null
+  if (formData.has('category')) update.category = (formData.get('category') as string).trim() || null
+  if (formData.has('language')) update.language = (formData.get('language') as string).trim() || null
+  if (formData.has('bio')) update.bio = (formData.get('bio') as string).trim() || null
+  if (formData.has('consent_ai_research')) update.consent_ai_research = formData.get('consent_ai_research') === 'true'
+  if (formData.has('social_links')) update.social_links = social_links
+
+  await db.from('artists').update(update).eq('id', artistId)
   revalidatePath(`/admin-app/artists/${artistId}`)
 }

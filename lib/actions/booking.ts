@@ -1,5 +1,6 @@
 'use server'
 
+import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
   sendBookingOfferEmail,
@@ -98,6 +99,13 @@ export async function bookShow(showId: string) {
   if (reqError) throw new Error(reqError.message)
   if (!requirements?.length) return { offersCreated, candidatesMatched, datePreferenceMatches }
 
+  const { data: availableRows } = await admin
+    .from('artist_availability')
+    .select('artist_id')
+    .eq('available_date', show.date)
+
+  const availableArtistSet = new Set((availableRows ?? []).map((row) => row.artist_id))
+
   for (const req of requirements ?? []) {
     const { count: filledCount } = await admin
       .from('confirmed_spots')
@@ -106,14 +114,6 @@ export async function bookShow(showId: string) {
       .in('status', ['confirmed', 'completed', 'paid'])
 
     if ((filledCount ?? 0) >= req.quantity) continue
-
-    const { data: availableRows } = await admin
-      .from('artist_availability')
-      .select('artist_id')
-      .eq('available_date', show.date)
-
-    const availableArtistIds = [...new Set((availableRows ?? []).map((row) => row.artist_id))]
-    const availableArtistSet = new Set(availableArtistIds)
 
     // Artists who selected this date are prioritized, but not required.
     let query = admin
@@ -143,25 +143,28 @@ export async function bookShow(showId: string) {
       return (b.admin_score ?? 0) - (a.admin_score ?? 0)
     })
 
-    for (const artist of sortedCandidates) {
-      const [{ data: existingOffer }, { data: existingSpot }] = await Promise.all([
-        admin
-          .from('booking_offers')
-          .select('id')
-          .eq('artist_id', artist.id)
-          .eq('show_id', showId)
-          .in('status', ['sent', 'accepted'])
-          .maybeSingle(),
-        admin
-          .from('confirmed_spots')
-          .select('id')
-          .eq('artist_id', artist.id)
-          .eq('show_id', showId)
-          .in('status', ['confirmed', 'completed', 'paid'])
-          .maybeSingle(),
-      ])
+    const candidateIds = sortedCandidates.map((artist) => artist.id)
+    const [{ data: existingOffers }, { data: existingSpots }] = candidateIds.length > 0
+      ? await Promise.all([
+          admin
+            .from('booking_offers')
+            .select('artist_id')
+            .eq('show_id', showId)
+            .in('artist_id', candidateIds)
+            .in('status', ['sent', 'accepted']),
+          admin
+            .from('confirmed_spots')
+            .select('artist_id')
+            .eq('show_id', showId)
+            .in('artist_id', candidateIds)
+            .in('status', ['confirmed', 'completed', 'paid']),
+        ])
+      : [{ data: [] }, { data: [] }]
+    const artistsWithOffers = new Set((existingOffers ?? []).map((offer) => offer.artist_id))
+    const artistsWithSpots = new Set((existingSpots ?? []).map((spot) => spot.artist_id))
 
-      if (existingOffer || existingSpot) continue
+    for (const artist of sortedCandidates) {
+      if (artistsWithOffers.has(artist.id) || artistsWithSpots.has(artist.id)) continue
 
       const { data: offer, error: offerError } = await admin
         .from('booking_offers')
@@ -304,9 +307,12 @@ export async function automateFullbookedShow(showId: string) {
       artist_names: artistNames,
     })
 
+  const alreadyPublished = Boolean(show.published_at)
+  const publishedAt = show.published_at ?? new Date().toISOString()
+
   const marketingTasks: Array<{ show_id: string; task_key: MarketingTaskKey; label: string; is_completed: boolean }> = [
-    { show_id: showId, task_key: 'publish_event_page', label: 'Publiser eventside', is_completed: false },
-    { show_id: showId, task_key: 'activate_ticket_sales', label: 'Aktiver billettsalg', is_completed: false },
+    { show_id: showId, task_key: 'publish_event_page', label: 'Eventside publisert automatisk', is_completed: true },
+    { show_id: showId, task_key: 'activate_ticket_sales', label: 'Billettsalg aktivert automatisk', is_completed: true },
     { show_id: showId, task_key: 'upload_poster', label: 'Lineup-plakat generert automatisk', is_completed: Boolean(posterUrl) },
     { show_id: showId, task_key: 'create_facebook_event', label: facebookPost.posted ? 'Facebook-post publisert automatisk' : 'Facebook-post venter på API-oppsett', is_completed: facebookPost.posted },
     { show_id: showId, task_key: 'share_facebook_groups', label: 'Deling i Facebook-grupper venter på gruppeintegrasjon', is_completed: false },
@@ -315,18 +321,21 @@ export async function automateFullbookedShow(showId: string) {
   ]
 
   await admin.from('marketing_tasks').upsert(marketingTasks, { onConflict: 'show_id,task_key', ignoreDuplicates: false })
-  // Set show to fullbooked — admin publishes manually via the marketing checklist
+
+  // Publish show and set poster. Transitions from any pre-published status.
   await admin.from('shows').update({
-    status: 'fullbooked',
+    status: 'published',
+    published_at: publishedAt,
     ...(posterUrl ? { poster_url: posterUrl } : {}),
-  }).eq('id', showId).in('status', ['draft', 'booking'])
-  // Only update poster if already fullbooked/published, don't downgrade status
-  if (posterUrl) {
+  }).eq('id', showId).in('status', ['draft', 'booking', 'fullbooked'])
+
+  // If already published, still keep poster in sync without touching status/published_at
+  if (posterUrl && alreadyPublished) {
     await admin.from('shows').update({ poster_url: posterUrl })
-      .eq('id', showId).in('status', ['fullbooked', 'published'])
+      .eq('id', showId).eq('status', 'published')
   }
 
-  return { fullbooked: true, posterUrl, facebookPosted: facebookPost.posted }
+  return { fullbooked: true, posterUrl, facebookPosted: facebookPost.posted, published: true, publishedAt }
 }
 
 /**
@@ -505,6 +514,65 @@ export async function cancelConfirmedSpotForOffer(offerId: string) {
     .update({ status: 'cancelled', cancelled_at: new Date().toISOString() })
     .eq('booking_offer_id', offerId)
     .in('status', ['confirmed', 'completed', 'paid'])
+}
+
+export async function createManualBookingOffer(formData: FormData) {
+  const showId = formData.get('show_id') as string
+  const artistId = formData.get('artist_id') as string
+  const requirementId = formData.get('requirement_id') as string
+  const feeRaw = formData.get('fee_amount') as string
+
+  if (!showId || !artistId || !requirementId) throw new Error('Manglende felt')
+
+  const admin = createAdminClient()
+
+  const [{ data: show }, { data: artist }] = await Promise.all([
+    admin.from('shows').select('id, title, date').eq('id', showId).single(),
+    admin.from('artists').select('id, email, full_name').eq('id', artistId).single(),
+  ])
+
+  if (!show || !artist) throw new Error('Show eller artist ikke funnet')
+
+  const { data: offer, error } = await admin
+    .from('booking_offers')
+    .insert({
+      show_id: showId,
+      artist_id: artistId,
+      show_requirement_id: requirementId,
+      status: 'sent',
+      sent_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      ...(feeRaw ? { fee_amount: Math.round(parseFloat(feeRaw) * 100), currency: 'NOK' } : {}),
+    })
+    .select('token')
+    .single()
+
+  if (error || !offer) throw new Error(error?.message ?? 'Kunne ikke opprette tilbud')
+
+  await sendBookingOfferEmail({
+    email: artist.email,
+    full_name: artist.full_name,
+    show_title: show.title,
+    show_date: show.date,
+    token: offer.token,
+    response_url: `${publicAppUrl()}/booking-offer/${offer.token}`,
+  })
+
+  revalidatePath('/admin-app/bookings')
+}
+
+export async function cancelBookingOffer(formData: FormData) {
+  const offerId = formData.get('offer_id') as string
+  if (!offerId) throw new Error('Mangler offer_id')
+
+  const admin = createAdminClient()
+  await admin
+    .from('booking_offers')
+    .update({ status: 'cancelled', responded_at: new Date().toISOString() })
+    .eq('id', offerId)
+    .eq('status', 'sent')
+
+  revalidatePath('/admin-app/bookings')
 }
 
 /**

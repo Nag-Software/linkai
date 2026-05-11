@@ -15,7 +15,10 @@ export async function getCurrentArtist() {
     .eq('auth_user_id', user.id)
     .single()
 
-  if (!artist) redirect('/signup?error=missing')
+  if (!artist) {
+    await supabase.auth.signOut()
+    redirect('/signup?error=missing')
+  }
 
   return { user, artist, db }
 }

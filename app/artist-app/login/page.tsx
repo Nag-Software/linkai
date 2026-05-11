@@ -10,7 +10,14 @@ export default async function ArtistLoginPage({
   const { error, next } = await searchParams
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (user) redirect(next || '/')
+  if (user) {
+    const db = (await import('@/lib/supabase/admin')).createAdminClient()
+    const { data: artist } = await db.from('artists').select('id').eq('auth_user_id', user.id).single()
+    if (!artist) {
+      redirect('/logout')
+    }
+    redirect(next || '/')
+  }
 
   return (
     <div className="flex min-h-svh w-full items-center justify-center bg-background p-6 md:p-10">

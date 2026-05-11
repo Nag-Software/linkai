@@ -5,6 +5,8 @@ const supabaseHostname = process.env.NEXT_PUBLIC_SUPABASE_URL
   : "*.supabase.co";
 
 const nextConfig: NextConfig = {
+  outputFileTracingRoot: process.cwd(),
+  turbopack: {},
   images: {
     remotePatterns: [
       {
@@ -25,6 +27,21 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: "10mb",
     },
+    webpackMemoryOptimizations: true,
+    preloadEntriesOnStart: false,
+  },
+  webpack(config, { dev }) {
+    if (dev) {
+      // Limit parallel module compilation to reduce peak memory during rebuilds
+      config.parallelism = 2;
+      // Debounce file-watcher rebuilds — fewer rapid recompiles = lower memory spikes
+      config.watchOptions = {
+        ...config.watchOptions,
+        aggregateTimeout: 400,
+        poll: false,
+      };
+    }
+    return config;
   },
 };
 
