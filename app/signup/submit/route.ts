@@ -6,10 +6,11 @@ export async function POST(request: Request) {
   const pathname = new URL(request.url).pathname
   const signupPath = pathname.startsWith('/artist-app/') ? '/artist-app/signup' : '/signup'
   const formData = await request.formData()
+  const email = String(formData.get('email') ?? '').trim().toLowerCase()
 
   try {
     await registerArtist({
-      email: String(formData.get('email') ?? ''),
+      email,
       password: String(formData.get('password') ?? ''),
       full_name: String(formData.get('full_name') ?? ''),
       stage_name: optionalString(formData.get('stage_name')),
@@ -22,11 +23,20 @@ export async function POST(request: Request) {
       profile_image_file: fileOrUndefined(formData.get('profile_image_file')),
     })
 
-    return NextResponse.redirect(new URL(`${signupPath}?status=submitted`, origin))
+    return NextResponse.redirect(new URL(`${signupPath}?status=submitted`, origin), 303)
   } catch (error) {
     console.error(error)
-    return NextResponse.redirect(new URL(`${signupPath}?error=failed`, origin))
+    const code = toSignupErrorCode(error)
+    return NextResponse.redirect(new URL(`${signupPath}?error=${code}`, origin), 303)
   }
+}
+
+function toSignupErrorCode(error: unknown) {
+  const message = error instanceof Error ? error.message.toLowerCase() : ''
+  if (message.includes('already') || message.includes('duplicate')) return 'email_exists'
+  if (message.includes('password')) return 'invalid_password'
+  if (message.includes('email')) return 'invalid_email'
+  return 'failed'
 }
 
 function optionalString(value: FormDataEntryValue | null) {

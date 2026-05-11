@@ -26,12 +26,14 @@ export interface RegisterArtistInput {
  */
 export async function registerArtist(input: RegisterArtistInput) {
   const admin = createAdminClient()
+  const normalizedEmail = input.email.trim().toLowerCase()
 
   // 1. Create Supabase Auth user
   const { data: authData, error: authError } = await admin.auth.admin.createUser({
-    email: input.email,
+    email: normalizedEmail,
     password: input.password,
-    email_confirm: false,
+    // We do not run a separate email verification flow in MVP.
+    email_confirm: true,
   })
   if (authError || !authData.user) {
     throw new Error(authError?.message ?? 'Failed to create auth user')
@@ -42,7 +44,7 @@ export async function registerArtist(input: RegisterArtistInput) {
     // 2. Create profile with role = artist
     const { error: profileError } = await admin.from('profiles').insert({
       auth_user_id: authUserId,
-      email: input.email,
+      email: normalizedEmail,
       full_name: input.full_name,
       role: 'artist',
     })
@@ -67,7 +69,7 @@ export async function registerArtist(input: RegisterArtistInput) {
       auth_user_id: authUserId,
       full_name: input.full_name,
       stage_name: input.stage_name ?? null,
-      email: input.email,
+      email: normalizedEmail,
       phone: input.phone ?? null,
       profile_image_url: profile_image_url ?? null,
       bio: input.bio ?? null,
@@ -87,7 +89,7 @@ export async function registerArtist(input: RegisterArtistInput) {
     if (assessError) throw new Error(assessError.message)
 
     // 6. Send registration confirmation email
-    await sendArtistRegisteredEmail({ email: input.email, full_name: input.full_name })
+    await sendArtistRegisteredEmail({ email: normalizedEmail, full_name: input.full_name })
 
     // 7. Trigger AI research (fire-and-forget — do not await)
     if (input.consent_ai_research) {

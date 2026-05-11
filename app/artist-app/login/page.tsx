@@ -27,6 +27,7 @@ export default async function ArtistLoginPage({
           description="Logg inn med artistkonto"
           action="/artist-app/login/submit"
           errorMessage={error === 'invalid' ? 'Feil e-post eller passord.' : undefined}
+          signupHref="/artist-app/signup"
           nextPath={next}
         />
       </div>

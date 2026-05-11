@@ -26,6 +26,7 @@ export function LoginForm({
   action = "#",
   errorMessage,
   showSignupLink = true,
+  signupHref = '/signup',
   nextPath,
   ...props
 }: React.ComponentProps<"div"> & {
@@ -34,6 +35,7 @@ export function LoginForm({
   action?: string
   errorMessage?: string
   showSignupLink?: boolean
+  signupHref?: string
   nextPath?: string
 }) {
   useEffect(() => {
@@ -76,7 +78,7 @@ export function LoginForm({
                 <Button type="submit">Logg inn</Button>
                 {showSignupLink && (
                   <FieldDescription className="text-center">
-                    Ny artist? <a href="/signup">Registrer artistprofil</a>
+                    Ny artist? <a href={signupHref}>Registrer artistprofil</a>
                   </FieldDescription>
                 )}
               </Field>

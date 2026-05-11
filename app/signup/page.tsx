@@ -22,7 +22,19 @@ export default async function SignupPage({
         <div className="border-2 border-zinc-950 bg-[#fbf7ec] p-5 shadow-[8px_8px_0_rgba(24,24,27,0.14)]">
           <SignupForm
             successMessage={status === 'submitted' ? 'Profilen er sendt til vurdering.' : undefined}
-            errorMessage={error === 'failed' ? 'Kunne ikke opprette profilen. Prøv igjen.' : undefined}
+            errorMessage={
+              error === 'email_exists'
+                ? 'E-postadressen er allerede registrert. Prøv å logge inn.'
+                : error === 'invalid_password'
+                  ? 'Passordet må være minst 8 tegn.'
+                  : error === 'invalid_email'
+                    ? 'Ugyldig e-postadresse.'
+                    : error === 'unconfirmed'
+                      ? 'Kontoen er ikke aktiv ennå. Registrer artistprofil på nytt eller kontakt oss.'
+                      : error === 'failed'
+                        ? 'Kunne ikke opprette profilen. Prøv igjen.'
+                        : undefined
+            }
           />
         </div>
       </section>

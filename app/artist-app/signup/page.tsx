@@ -15,7 +15,19 @@ export default async function ArtistSignupPage({
         <SignupForm
           action="/artist-app/signup/submit"
           successMessage={status === 'submitted' ? 'Profilen er sendt til vurdering.' : undefined}
-          errorMessage={error === 'failed' ? 'Kunne ikke opprette profilen. Prøv igjen.' : undefined}
+          errorMessage={
+            error === 'email_exists'
+              ? 'E-postadressen er allerede registrert. Prøv å logge inn.'
+              : error === 'invalid_password'
+                ? 'Passordet må være minst 8 tegn.'
+                : error === 'invalid_email'
+                  ? 'Ugyldig e-postadresse.'
+                  : error === 'unconfirmed'
+                    ? 'Kontoen er ikke aktiv ennå. Registrer artistprofil på nytt eller kontakt oss.'
+                    : error === 'failed'
+                      ? 'Kunne ikke opprette profilen. Prøv igjen.'
+                      : undefined
+          }
         />
       </div>
     </div>

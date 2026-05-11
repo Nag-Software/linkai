@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error || !data.user) {
-    return NextResponse.redirect(new URL(`${adminPrefix}/login?error=invalid`, origin))
+    return NextResponse.redirect(new URL(`${adminPrefix}/login?error=invalid`, origin), 303)
   }
 
   const db = createAdminClient()
@@ -26,8 +26,8 @@ export async function POST(request: Request) {
   const allowed = ['owner', 'admin', 'staff']
   if (!profile || !allowed.includes(profile.role)) {
     await supabase.auth.signOut()
-    return NextResponse.redirect(new URL(`${adminPrefix}/login?error=unauthorized`, origin))
+    return NextResponse.redirect(new URL(`${adminPrefix}/login?error=unauthorized`, origin), 303)
   }
 
-  return NextResponse.redirect(new URL(adminPrefix, origin))
+  return NextResponse.redirect(new URL(adminPrefix, origin), 303)
 }
