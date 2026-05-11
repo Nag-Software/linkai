@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { publicAcceptOfferAction, publicDeclineOfferAction } from './actions'
+import { PublicHeader } from '@/components/public/public-header'
 
 export default async function PublicBookingOfferPage({
   params,
@@ -91,18 +92,21 @@ export default async function PublicBookingOfferPage({
   const canRespond = offer.status === 'sent' && !isExpired
 
   return (
-    <main className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-6">
-        <div className="text-center space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight">Bookingtilbud</h1>
-          <p className="text-muted-foreground text-sm">Du har mottatt et tilbud om å opptre</p>
+    <main className="min-h-screen bg-[#f3ead9] text-zinc-950">
+      <PublicHeader transparent tone="light" />
+      <section className="mx-auto grid max-w-6xl gap-8 px-4 py-12 md:grid-cols-[0.85fr_1fr] md:px-6 lg:px-8">
+        <div className="md:pt-8">
+          <div className="mb-5 inline-flex border border-zinc-950 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.22em]">Booking</div>
+          <h1 className="text-[clamp(3rem,7vw,6rem)] font-black uppercase leading-[0.82] tracking-[-0.04em]">Bookingtilbud</h1>
+          <p className="mt-5 max-w-md text-base font-medium text-zinc-700">Du har mottatt et tilbud om å opptre. Svar på tilbudet under.</p>
         </div>
 
-        <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
-          <div className="bg-muted/40 px-6 py-4 border-b">
-            <h2 className="font-semibold text-lg">{show?.title ?? 'Show'}</h2>
+        <div className="w-full max-w-xl space-y-5">
+        <div className="border-2 border-zinc-950 bg-[#fbf7ec] shadow-[8px_8px_0_rgba(24,24,27,0.14)]">
+          <div className="border-b-2 border-zinc-950 px-6 py-4">
+            <h2 className="text-2xl font-black tracking-tight">{show?.title ?? 'Show'}</h2>
             {show?.date && (
-              <p className="text-muted-foreground text-sm capitalize">{formatDate(show.date)}</p>
+              <p className="text-sm font-medium capitalize text-zinc-600">{formatDate(show.date)}</p>
             )}
           </div>
           <div className="p-6 grid grid-cols-2 gap-4">
@@ -119,7 +123,7 @@ export default async function PublicBookingOfferPage({
               <input type="hidden" name="token" value={token} />
               <button
                 type="submit"
-                className="w-full rounded-lg bg-primary text-primary-foreground font-semibold py-3 px-4 hover:bg-primary/90 transition-colors"
+                className="w-full border-2 border-zinc-950 bg-[#b83224] px-4 py-3 font-bold text-white shadow-[4px_4px_0_#18181b] transition hover:bg-[#9f2d21]"
               >
                 Ja, jeg tar spotten
               </button>
@@ -128,7 +132,7 @@ export default async function PublicBookingOfferPage({
               <input type="hidden" name="token" value={token} />
               <button
                 type="submit"
-                className="w-full rounded-lg border bg-background font-medium py-3 px-4 hover:bg-muted transition-colors text-sm"
+                className="w-full border-2 border-zinc-950 bg-transparent px-4 py-3 text-sm font-bold transition hover:bg-zinc-950 hover:text-white"
               >
                 Nei, det passer ikke
               </button>
@@ -137,18 +141,19 @@ export default async function PublicBookingOfferPage({
         )}
 
         {!canRespond && !result && (
-          <div className="rounded-lg border bg-muted/40 p-4 text-center text-sm text-muted-foreground">
+          <div className="border-2 border-zinc-950 bg-[#fbf7ec] p-4 text-center text-sm font-medium text-zinc-600">
             {isExpired ? 'Dette tilbudet er utløpt.' : `Status: ${offer.status.replaceAll('_', ' ')}`}
           </div>
         )}
 
-        <p className="text-center text-xs text-muted-foreground">
+        <p className="text-center text-xs font-medium text-zinc-600">
           Spørsmål? Kontakt oss på{' '}
           <a href="mailto:hei@humor.events" className="underline underline-offset-2">
             hei@humor.events
           </a>
         </p>
       </div>
+      </section>
     </main>
   )
 }
@@ -156,8 +161,8 @@ export default async function PublicBookingOfferPage({
 function InfoCell({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="text-xs text-muted-foreground mb-0.5">{label}</div>
-      <div className="font-medium text-sm">{value}</div>
+      <div className="mb-0.5 text-[10px] font-bold uppercase tracking-widest text-zinc-500">{label}</div>
+      <div className="text-sm font-bold">{value}</div>
     </div>
   )
 }
@@ -174,16 +179,16 @@ function ResultPage({
   variant: 'success' | 'neutral' | 'error'
 }) {
   const colors = {
-    success: 'bg-green-50 border-green-200 text-green-800',
-    neutral: 'bg-muted border-border text-foreground',
-    error: 'bg-red-50 border-red-200 text-red-800',
+    success: 'text-[#1f6f43]',
+    neutral: 'text-zinc-950',
+    error: 'text-[#b83224]',
   }
   return (
-    <main className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className={`w-full max-w-sm rounded-xl border p-8 text-center space-y-3 ${colors[variant]}`}>
-        <div className="text-4xl">{icon}</div>
-        <h1 className="text-xl font-bold">{title}</h1>
-        <p className="text-sm opacity-80">{message}</p>
+    <main className="flex min-h-screen items-center justify-center bg-[#f3ead9] p-4 text-zinc-950">
+      <div className="w-full max-w-sm border-2 border-zinc-950 bg-[#fbf7ec] p-8 text-center shadow-[8px_8px_0_rgba(24,24,27,0.14)]">
+        <div className={`text-5xl font-black ${colors[variant]}`}>{icon}</div>
+        <h1 className="mt-3 text-2xl font-black uppercase tracking-tight">{title}</h1>
+        <p className="mt-2 text-sm font-medium text-zinc-700">{message}</p>
       </div>
     </main>
   )

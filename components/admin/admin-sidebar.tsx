@@ -63,7 +63,7 @@ export function AdminSidebar({ user }: AdminSidebarProps) {
                   <Music2 className="size-4" />
                 </div>
                 <div className="flex flex-col gap-0.5 leading-none">
-                  <span className="font-semibold">Booking-center</span>
+                  <span className="font-semibold">humor.events</span>
                   <span className="text-xs text-muted-foreground capitalize">{user.role}</span>
                 </div>
               </Link>

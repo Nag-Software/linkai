@@ -1,4 +1,5 @@
 import { SignupForm } from "@/components/signup-form"
+import { PublicHeader } from "@/components/public/public-header"
 
 export const metadata = { title: 'Lag komikerprofil — humor.events' }
 
@@ -10,13 +11,21 @@ export default async function SignupPage({
   const { status, error } = await searchParams
 
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-6 md:p-10">
-      <div className="w-full max-w-xl">
-        <SignupForm
-          successMessage={status === 'submitted' ? 'Profilen er sendt til vurdering.' : undefined}
-          errorMessage={error === 'failed' ? 'Kunne ikke opprette profilen. Prøv igjen.' : undefined}
-        />
-      </div>
-    </div>
+    <main className="min-h-svh bg-[#f3ead9] text-zinc-950">
+      <PublicHeader transparent tone="light" />
+      <section className="mx-auto grid max-w-6xl gap-8 px-4 py-10 md:grid-cols-[0.8fr_1fr] md:px-6 lg:px-8">
+        <div className="md:pt-10">
+          <div className="mb-5 inline-flex border border-zinc-950 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.22em]">Artistprofil</div>
+          <h1 className="text-[clamp(3rem,7vw,6rem)] font-black uppercase leading-[0.82] tracking-[-0.04em]">Bli en del av lineupen</h1>
+          <p className="mt-5 max-w-md text-base font-medium text-zinc-700">Send inn profil, sceneerfaring og lenker. Booking-teamet vurderer nye profiler fortløpende.</p>
+        </div>
+        <div className="border-2 border-zinc-950 bg-[#fbf7ec] p-5 shadow-[8px_8px_0_rgba(24,24,27,0.14)]">
+          <SignupForm
+            successMessage={status === 'submitted' ? 'Profilen er sendt til vurdering.' : undefined}
+            errorMessage={error === 'failed' ? 'Kunne ikke opprette profilen. Prøv igjen.' : undefined}
+          />
+        </div>
+      </section>
+    </main>
   )
 }

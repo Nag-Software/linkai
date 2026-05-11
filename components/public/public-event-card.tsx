@@ -1,12 +1,12 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowUpRight, CalendarDays, MapPin, Ticket, Users } from 'lucide-react'
+import { ArrowUpRight, Ticket } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { PublicShow } from '@/lib/public-events'
 import { formatShortDate, formatShowTime, formatTicketPrice, remainingTickets, ticketFillPercent } from '@/lib/public-events'
 import { startCheckoutAction } from '@/app/events/actions'
 
-export function PublicEventCard({ show, priority = false }: { show: PublicShow; priority?: boolean }) {
+export function PublicEventCard({ show, priority = false, compact = false }: { show: PublicShow; priority?: boolean; compact?: boolean }) {
   const remaining = remainingTickets(show)
   const soldOut = remaining === 0
   const fillPercent = ticketFillPercent(show)
@@ -14,56 +14,51 @@ export function PublicEventCard({ show, priority = false }: { show: PublicShow; 
   const showLocation = show.venue_name ?? show.venue_address
 
   return (
-    <article className="group overflow-hidden rounded-lg border bg-card shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl">
-      <Link href={`/events/${show.slug}`} className="group block">
-        <div className="relative aspect-[4/5] bg-zinc-950 text-white">
+    <article className="group border-2 border-zinc-950 bg-[#fbf7ec] shadow-[6px_6px_0_rgba(24,24,27,0.14)] transition hover:-translate-y-0.5 hover:shadow-[4px_4px_0_rgba(24,24,27,0.22)]">
+      <Link href={`/events/${show.slug}`} className="block">
+        <div className={`relative border-b-2 border-zinc-950 bg-[#111111] ${compact ? 'aspect-[16/10]' : 'aspect-[2/3]'}`}>
           {show.poster_url ? (
-            <Image src={show.poster_url} alt={show.title} fill priority={priority} className="object-fit transition-transform duration-500 group-hover:scale-101" />
+            <Image src={show.poster_url} alt={show.title} fill priority={priority} sizes={compact ? '(max-width: 768px) 92vw, 31vw' : '(max-width: 768px) 92vw, (max-width: 1024px) 45vw, 31vw'} className="object-contain grayscale-[10%] transition duration-500 group-hover:grayscale-0" />
           ) : (
-            <div className="flex h-full flex-col justify-between bg-[linear-gradient(135deg,#111827_0%,#be123c_58%,#f59e0b_118%)] p-5">
-              <span className="w-fit rounded-full bg-white/15 px-3 py-1 text-xs uppercase tracking-wide">humor.events</span>
-              <strong className="max-w-[13rem] text-3xl leading-none">{show.title}</strong>
+            <div className={`flex h-full flex-col justify-between bg-[#b83224] text-white ${compact ? 'p-4' : 'p-5'}`}>
+              <span className="text-xs font-black uppercase tracking-widest">humor.events</span>
+              <strong className={`font-black uppercase leading-none ${compact ? 'text-2xl' : 'text-3xl'}`}>{show.title}</strong>
             </div>
           )}
-          <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/75 to-transparent" />
-          <div className="absolute left-3 top-3 rounded-md bg-background/95 px-3 py-2 text-center text-foreground shadow-sm">
-            <div className="text-lg font-bold leading-none">{day}</div>
-            <div className="text-xs uppercase text-muted-foreground">{month}</div>
-          </div>
-          <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between gap-2 text-xs font-medium">
-            <span className="rounded-full bg-white/15 px-3 py-1 backdrop-blur">{formatTicketPrice(show)}</span>
-            <span className="rounded-full bg-white px-3 py-1 text-zinc-950">{soldOut ? 'Utsolgt' : remaining !== null ? `${remaining} igjen` : 'Billetter'}</span>
+          <div className={`absolute left-3 top-3 border-2 border-zinc-950 bg-[#fbf7ec] px-3 py-2 text-center text-zinc-950 shadow-[3px_3px_0_rgba(24,24,27,0.2)] ${compact ? 'py-1.5' : ''}`}>
+            <div className={`font-black leading-none tracking-[-0.05em] ${compact ? 'text-xl' : 'text-2xl'}`}>{day}</div>
+            <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">{month}</div>
           </div>
         </div>
       </Link>
-      <div className="grid gap-4 p-4">
+      <div className={`grid ${compact ? 'gap-3 p-3' : 'gap-4 p-4'}`}>
         <div>
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{formatShowTime(show)}</span>
-            <ArrowUpRight className="size-4 text-muted-foreground transition group-hover:text-foreground" />
+          <div className="mb-2 flex items-center justify-between gap-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">
+            <span>{formatShowTime(show)}</span>
+            <ArrowUpRight className="size-4 transition group-hover:text-[#b83224]" />
           </div>
-          <h3 className="min-h-12 text-lg font-semibold leading-tight">{show.title}</h3>
-          <div className="mt-2 grid gap-1 text-sm text-muted-foreground">
-            <span className="flex items-center gap-2"><CalendarDays className="size-4" />{formatShortDate(show.date)}</span>
-            <span className="flex items-center gap-2"><MapPin className="size-4" />{showLocation ?? 'Sted kommer'}</span>
-            <span className="flex items-center gap-2"><Ticket className="size-4" />{formatTicketPrice(show)}</span>
-          </div>
+          <h3 className={`font-black leading-tight tracking-tight ${compact ? 'min-h-0 text-base' : 'min-h-12 text-xl'}`}>{show.title}</h3>
+          <p className={`mt-2 text-zinc-600 ${compact ? 'text-xs' : 'text-sm'}`}>
+            {showLocation ?? 'Sted kommer'} · {formatTicketPrice(show)}
+          </p>
         </div>
         <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span className="flex items-center gap-1.5"><Users className="size-3.5" /> Kapasitet</span>
+          <div className="flex items-center justify-between text-xs font-medium text-zinc-600">
+            <span>{soldOut ? 'Utsolgt' : remaining !== null ? `${remaining} igjen` : 'Billetter'}</span>
             <span>{show.capacity ? `${show.soldTickets}/${show.capacity}` : 'Åpent'}</span>
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-muted">
-            <div className="h-full rounded-full bg-[linear-gradient(90deg,#18181b,#be123c,#f59e0b)]" style={{ width: `${fillPercent}%` }} />
+          <div className="h-2 border border-zinc-950 bg-[#f3ead9]">
+            <div className="h-full bg-[#b83224]" style={{ width: `${fillPercent}%` }} />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <Button asChild variant="outline"><Link href={`/events/${show.slug}`}>Les mer <ArrowUpRight className="size-4" /></Link></Button>
+          <Button asChild variant="outline" size={compact ? 'sm' : 'default'} className="rounded-none border-2 border-zinc-950 bg-transparent font-bold hover:bg-zinc-950 hover:text-white"><Link href={`/events/${show.slug}`}>Les mer <ArrowUpRight className="size-4" /></Link></Button>
           <form action={startCheckoutAction}>
             <input type="hidden" name="show_id" value={show.id} />
             <input type="hidden" name="slug" value={show.slug} />
-            <Button type="submit" className="w-full" disabled={soldOut}>{soldOut ? 'Utsolgt' : 'Kjøp billett'}</Button>
+            <Button type="submit" size={compact ? 'sm' : 'default'} className="w-full rounded-none border-2 border-zinc-950 bg-[#b83224] font-bold text-white hover:bg-[#9f2d21]" disabled={soldOut}>
+              <Ticket className="size-4" /> {soldOut ? 'Utsolgt' : 'Kjøp'}
+            </Button>
           </form>
         </div>
       </div>

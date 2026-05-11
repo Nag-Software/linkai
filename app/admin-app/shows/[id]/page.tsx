@@ -4,14 +4,17 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { AdminHeader } from '@/components/admin/admin-header'
 import { ToastActionForm } from '@/components/toast-action-form'
 import { ManualSpotForm } from './manual-spot-form'
+import { DeleteButton } from '@/components/admin/delete-button'
 import {
   addRequirementAction,
   deleteRequirementAction,
+  deleteShowAction,
   generatePosterAction,
   removeSpotAction,
   updateShowDetailsAction,
   updateRequirementAction,
 } from '../actions'
+import Image from 'next/image'
 
 type ShowTab = 'overview' | 'requirements' | 'booking' | 'lineup' | 'marketing' | 'tickets'
 type LineupMode = 'auto' | 'manual'
@@ -155,6 +158,12 @@ export default async function ShowDetailPage({
             <Link href="/admin-app/shows" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
               ← Tilbake
             </Link>
+            <DeleteButton
+              action={deleteShowAction}
+              id={show.id}
+              idField="show_id"
+              confirmMessage={`Slett showen "${show.title}"? Dette kan ikke angres.`}
+            />
           </div>
         }
       />
@@ -189,7 +198,7 @@ export default async function ShowDetailPage({
             {totalSlots > 0 && (
               <div className="rounded-xl border bg-card p-5 space-y-4">
                 <div className="flex items-center justify-between">
-                  <h2 className="font-semibold text-sm">Booking-fremgang</h2>
+                  <h2 className="font-semibold text-sm">fremgang</h2>
                   <span className="text-sm font-bold tabular-nums">{totalFilled}/{totalSlots} plasser fylt</span>
                 </div>
                 <div className="h-2.5 rounded-full bg-muted overflow-hidden">
@@ -486,7 +495,7 @@ export default async function ShowDetailPage({
                             <tr key={o.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
                               <td className="px-4 py-3 w-10">
                                 {artist?.profile_image_url ? (
-                                  <img src={artist.profile_image_url} alt="" className="size-8 rounded-full object-cover" />
+                                  <Image src={artist.profile_image_url} alt="" width={32} height={32} className="size-8 rounded-full object-cover" />
                                 ) : (
                                   <div className="size-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground">
                                     {(artist?.full_name ?? '?').charAt(0)}

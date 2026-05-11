@@ -10,7 +10,9 @@ import {
   rejectArtistAction,
   rerunAiAction,
   applyAiSuggestion,
+  deleteArtistAction,
 } from './actions'
+import { DeleteButton } from '@/components/admin/delete-button'
 
 export default async function ArtistDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -31,9 +33,17 @@ export default async function ArtistDetailPage({ params }: { params: Promise<{ i
         title={artist.full_name}
         description={artist.stage_name ?? artist.email}
         actions={
-          <Link href="/admin-app/artists" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-            ← Tilbake
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link href="/admin-app/artists" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+              ← Tilbake
+            </Link>
+            <DeleteButton
+              action={deleteArtistAction}
+              id={artist.id}
+              idField="artist_id"
+              confirmMessage={`Slett artisten "${artist.full_name}"? Dette kan ikke angres.`}
+            />
+          </div>
         }
       />
 

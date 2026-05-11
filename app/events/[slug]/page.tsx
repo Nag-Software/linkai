@@ -52,47 +52,54 @@ export default async function EventDetailPage({ params, searchParams }: Props) {
   const showLocation = show.venue_name ?? show.venue_address
 
   return (
-    <main className="min-h-svh bg-background">
-      <PublicHeader />
-      <section className="relative overflow-hidden border-b bg-zinc-950 text-white">
-        <div className="absolute inset-0 bg-[linear-gradient(125deg,#09090b_0%,#18181b_48%,#7f1d1d_88%,#f59e0b_135%)]" />
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(180deg,rgba(255,255,255,0.07)_1px,transparent_1px)] bg-[size:72px_72px] opacity-20" />
-        <div className="relative mx-auto grid max-w-6xl gap-8 px-4 py-8 md:grid-cols-[430px_1fr] md:px-6 lg:px-8">
-          <div className="relative aspect-[4/5] overflow-hidden rounded-lg bg-zinc-900 shadow-2xl">
+    <main className="min-h-svh bg-[#f3ead9] text-zinc-950">
+      <PublicHeader transparent tone="light" />
+        <section className="relative overflow-hidden border-b-2 border-zinc-950 bg-[#f3ead9]">
+        <div
+          aria-hidden
+          className="absolute inset-0 opacity-[0.16]"
+          style={{
+            backgroundImage:
+              "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.45'/></svg>\")",
+          }}
+        />
+        <div className="relative mx-auto grid max-w-6xl gap-8 px-4 pb-10 pt-8 md:grid-cols-[360px_1fr] md:items-end md:px-6 md:pb-14 lg:px-8">
+          <div className="relative aspect-[4/5] overflow-hidden border-2 border-zinc-950 bg-zinc-200 p-2 shadow-[10px_10px_0_rgba(24,24,27,0.18)]">
             {show.poster_url ? (
-              <Image src={show.poster_url} alt={show.title} fill priority className="object-cover" />
+              <Image src={show.poster_url} alt={show.title} fill priority sizes="(max-width: 768px) 92vw, 360px" className="object-contain p-2 grayscale-[10%]" />
             ) : (
-              <div className="flex h-full flex-col justify-between bg-[linear-gradient(135deg,#111827_0%,#be123c_58%,#f59e0b_118%)] p-6">
-                <span className="w-fit rounded-full bg-white/15 px-3 py-1 text-xs uppercase tracking-wide">humor.events</span>
-                <strong className="text-5xl leading-none">{show.title}</strong>
+              <div className="flex h-full flex-col justify-between bg-[#b83224] p-6 text-white">
+                <span className="text-xs font-black uppercase tracking-widest">humor.events</span>
+                <strong className="text-5xl font-black uppercase leading-none">{show.title}</strong>
               </div>
             )}
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-5 pt-16">
-              <div className="flex items-center justify-between text-sm">
+              <div className="absolute inset-x-2 bottom-2 border-t-2 border-zinc-950 bg-[#fbf7ec] p-3 text-zinc-950">
+              <div className="flex items-center justify-between text-xs font-black uppercase tracking-widest">
                 <span>{formatTicketPrice(show)}</span>
                 <span>{soldOut ? 'Utsolgt' : remaining !== null ? `${remaining} igjen` : 'Billetter'}</span>
               </div>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/25">
-                <div className="h-full rounded-full bg-white" style={{ width: `${fillPercent}%` }} />
+              <div className="mt-3 h-2 border border-zinc-950 bg-[#f3ead9]">
+                <div className="h-full bg-[#b83224]" style={{ width: `${fillPercent}%` }} />
               </div>
             </div>
           </div>
           <div className="flex flex-col justify-center py-4">
-            <Button asChild variant="ghost" className="mb-5 w-fit px-0 text-white hover:bg-white/10 hover:text-white"><Link href="/events"><ArrowLeft className="size-4" /> Alle events</Link></Button>
-            <h1 className="text-5xl font-semibold leading-none md:text-6xl">{show.title}</h1>
-            <div className="mt-7 grid gap-3 text-white/78 sm:grid-cols-2">
+            <Button asChild variant="ghost" className="mb-5 w-fit rounded-none px-0 font-bold hover:bg-transparent hover:text-[#b83224]"><Link href="/events"><ArrowLeft className="size-4" /> Alle events</Link></Button>
+            <div className="mb-5 inline-flex w-fit border border-zinc-950 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.22em]">Event</div>
+            <h1 className="text-[clamp(3rem,7vw,6.4rem)] font-black uppercase leading-[0.82] tracking-[-0.04em]">{show.title}</h1>
+            <div className="mt-7 grid border-y-2 border-zinc-950 sm:grid-cols-2">
               <Info icon={<CalendarDays className="size-5" />} label="Dato" text={formatShowDate(show.date)} />
               <Info icon={<Clock className="size-5" />} label="Tid" text={formatShowTime(show)} />
               <Info icon={<MapPin className="size-5" />} text={showLocation ?? 'Sted kommer'} />
               <Info icon={<Ticket className="size-5" />} text={`${formatTicketPrice(show)}${remaining !== null ? ` · ${remaining} billetter igjen` : ''}`} />
               <Info icon={<Users className="size-5" />} text={`${lineup.length} artister i lineup`} />
             </div>
-            {error === 'sold-out' && <div className="mt-6 rounded-lg bg-white px-4 py-3 text-sm font-medium text-zinc-950">Dette showet er utsolgt.</div>}
-            {error === 'checkout' && <div className="mt-6 rounded-lg bg-white px-4 py-3 text-sm font-medium text-zinc-950">Checkout kunne ikke åpnes akkurat nå.</div>}
+            {error === 'sold-out' && <div className="mt-6 border-2 border-zinc-950 bg-[#fbf7ec] px-4 py-3 text-sm font-bold">Dette showet er utsolgt.</div>}
+            {error === 'checkout' && <div className="mt-6 border-2 border-zinc-950 bg-[#fbf7ec] px-4 py-3 text-sm font-bold">Checkout kunne ikke åpnes akkurat nå.</div>}
             <ToastActionForm action={startCheckoutAction} className="mt-8">
               <input type="hidden" name="show_id" value={show.id} />
               <input type="hidden" name="slug" value={show.slug} />
-              <Button type="submit" size="lg" disabled={soldOut} className="bg-white text-zinc-950 hover:bg-white/85">{soldOut ? 'Dette showet er utsolgt' : 'Kjøp billett'}</Button>
+              <Button type="submit" size="lg" disabled={soldOut} className="rounded-none border-2 border-zinc-950 bg-[#b83224] font-bold text-white shadow-[4px_4px_0_#18181b] hover:bg-[#9f2d21]">{soldOut ? 'Dette showet er utsolgt' : 'Kjøp billett'}</Button>
             </ToastActionForm>
           </div>
         </div>
@@ -100,42 +107,42 @@ export default async function EventDetailPage({ params, searchParams }: Props) {
 
       <section className="mx-auto grid max-w-6xl gap-8 px-4 py-12 md:grid-cols-[1fr_340px] md:px-6 lg:px-8">
         <div className="space-y-10">
-          <div>
-            <h2 className="text-2xl font-semibold">Om showet</h2>
-            <p className="mt-3 whitespace-pre-wrap text-muted-foreground">{show.description ?? 'Mer informasjon kommer snart.'}</p>
+          <div className="border-2 border-zinc-950 bg-[#fbf7ec] p-5 shadow-[6px_6px_0_rgba(24,24,27,0.12)]">
+            <h2 className="text-2xl font-black uppercase tracking-tight">Om showet</h2>
+            <p className="mt-3 whitespace-pre-wrap text-zinc-700">{show.description ?? 'Mer informasjon kommer snart.'}</p>
           </div>
           <div>
-            <h2 className="text-2xl font-semibold">Lineup</h2>
+            <h2 className="border-b-2 border-zinc-950 pb-3 text-2xl font-black uppercase tracking-tight">Lineup</h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               {lineup.map((item) => (
-                <Link key={item.spot.id} href={item.artist ? `/artists/${item.artist.id}` : '#'} className="group flex gap-4 rounded-lg border bg-card p-4 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl">
-                  <div className="relative size-20 shrink-0 overflow-hidden rounded-md bg-muted">
-                    {item.artist?.profile_image_url ? <Image src={item.artist.profile_image_url} alt={item.artist.stage_name ?? item.artist.full_name} fill className="object-cover transition-transform duration-500 group-hover:scale-105" /> : null}
+                <Link key={item.spot.id} href={item.artist ? `/artists/${item.artist.id}` : '#'} className="group grid grid-cols-[80px_1fr] border-2 border-zinc-950 bg-[#fbf7ec] shadow-[5px_5px_0_rgba(24,24,27,0.12)] transition hover:-translate-y-0.5">
+                  <div className="relative size-20 border-r-2 border-zinc-950 bg-zinc-200">
+                    {item.artist?.profile_image_url ? <Image src={item.artist.profile_image_url} alt={item.artist.stage_name ?? item.artist.full_name} fill sizes="80px" className="object-contain p-1 grayscale-[10%] transition group-hover:grayscale-0" /> : null}
                   </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground">{item.role?.role_name ?? 'Artist'}</div>
-                    <h3 className="font-semibold underline-offset-4 group-hover:underline">{item.artist?.stage_name ?? item.artist?.full_name ?? 'Artist'}</h3>
-                    {item.artist?.bio && <p className="mt-1 line-clamp-3 text-sm text-muted-foreground">{item.artist.bio}</p>}
+                  <div className="min-w-0 p-3">
+                    <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">{item.role?.role_name ?? 'Artist'}</div>
+                    <h3 className="truncate font-black tracking-tight group-hover:text-[#b83224]">{item.artist?.stage_name ?? item.artist?.full_name ?? 'Artist'}</h3>
+                    {item.artist?.bio && <p className="mt-1 line-clamp-2 text-sm text-zinc-600">{item.artist.bio}</p>}
                   </div>
                 </Link>
               ))}
-              {lineup.length === 0 && <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">Lineup annonseres snart.</div>}
+              {lineup.length === 0 && <div className="border-2 border-dashed border-zinc-950 bg-[#fbf7ec] p-6 text-sm font-medium text-zinc-600">Lineup annonseres snart.</div>}
             </div>
           </div>
         </div>
-        <aside className="h-fit rounded-lg border bg-card p-5 shadow-sm md:sticky md:top-6">
-          <div className="text-sm text-muted-foreground">Pris</div>
-          <div className="mt-1 text-3xl font-semibold">{formatTicketPrice(show)}</div>
+        <aside className="h-fit border-2 border-zinc-950 bg-[#fbf7ec] p-5 shadow-[6px_6px_0_rgba(24,24,27,0.12)] md:sticky md:top-6">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Pris</div>
+          <div className="mt-1 text-4xl font-black tracking-[-0.05em]">{formatTicketPrice(show)}</div>
           <div className="mt-5 space-y-2">
-            <div className="flex justify-between text-xs text-muted-foreground">
+            <div className="flex justify-between text-xs font-medium text-zinc-600">
               <span>Kapasitet</span>
               <span>{show.capacity ? `${show.soldTickets}/${show.capacity}` : 'Åpent'}</span>
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-muted">
-              <div className="h-full rounded-full bg-[linear-gradient(90deg,#18181b,#be123c,#f59e0b)]" style={{ width: `${fillPercent}%` }} />
+            <div className="h-2 border border-zinc-950 bg-[#f3ead9]">
+              <div className="h-full bg-[#b83224]" style={{ width: `${fillPercent}%` }} />
             </div>
           </div>
-          <div className="mt-4 space-y-2 text-sm text-muted-foreground">
+          <div className="mt-5 space-y-2 border-y-2 border-zinc-950 py-4 text-sm font-medium text-zinc-700">
             <div>{formatShowDate(show.date)}</div>
             <div>{formatShowTime(show)}</div>
             <div>{showLocation ?? 'Sted kommer'}</div>
@@ -143,7 +150,7 @@ export default async function EventDetailPage({ params, searchParams }: Props) {
           <ToastActionForm action={startCheckoutAction} className="mt-6">
             <input type="hidden" name="show_id" value={show.id} />
             <input type="hidden" name="slug" value={show.slug} />
-            <Button type="submit" className="w-full" disabled={soldOut}>{soldOut ? 'Utsolgt' : 'Kjøp billett'}</Button>
+            <Button type="submit" className="w-full rounded-none border-2 border-zinc-950 bg-[#b83224] font-bold text-white hover:bg-[#9f2d21]" disabled={soldOut}>{soldOut ? 'Utsolgt' : 'Kjøp billett'}</Button>
           </ToastActionForm>
         </aside>
       </section>
@@ -153,11 +160,11 @@ export default async function EventDetailPage({ params, searchParams }: Props) {
 
 function Info({ icon, text, label }: { icon: React.ReactNode; text: string; label?: string }) {
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/10 p-3 text-sm backdrop-blur">
-      <span className="text-white/70">{icon}</span>
+    <div className="flex items-center gap-3 border-b-2 border-zinc-950 p-3 text-sm last:border-b-0 sm:border-r-2 sm:even:border-r-0">
+      <span className="text-zinc-500">{icon}</span>
       <span>
-        {label && <span className="block text-xs uppercase tracking-wide text-white/45">{label}</span>}
-        <span className="text-white/88">{text}</span>
+        {label && <span className="block text-[10px] font-bold uppercase tracking-widest text-zinc-500">{label}</span>}
+        <span className="font-bold text-zinc-800">{text}</span>
       </span>
     </div>
   )

@@ -4,6 +4,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { AdminHeader } from '@/components/admin/admin-header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DeleteButton } from '@/components/admin/delete-button'
+import { deleteArtistAction } from './[id]/actions'
 import type { ArtistStatus, EnergyLevel } from '@/types/database'
 
 const statusColors: Record<ArtistStatus, string> = {
@@ -136,6 +138,7 @@ export default async function ArtistsPage({
                 <th className="text-left px-4 py-2.5 font-medium">Energi</th>
                 <th className="text-left px-4 py-2.5 font-medium">Tags</th>
                 <th className="text-left px-4 py-2.5 font-medium">Dato</th>
+                <th className="px-4 py-2.5" />
               </tr>
             </thead>
             <tbody>
@@ -143,7 +146,7 @@ export default async function ArtistsPage({
                 const ai = aiMap[a.id]
                 return (
                   <tr key={a.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 flex items-center">
                       <Link href={`/admin-app/artists/${a.id}`} className="flex flex-col hover:underline">
                         <span className="font-medium">{a.full_name}</span>
                         {a.stage_name && (
@@ -191,6 +194,14 @@ export default async function ArtistsPage({
                     </td>
                     <td className="px-4 py-3 text-muted-foreground text-xs whitespace-nowrap">
                       {new Date(a.created_at).toLocaleDateString('nb-NO')}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <DeleteButton
+                        action={deleteArtistAction}
+                        id={a.id}
+                        idField="artist_id"
+                        confirmMessage={`Slett artisten "${a.full_name}"? Dette kan ikke angres.`}
+                      />
                     </td>
                   </tr>
                 )

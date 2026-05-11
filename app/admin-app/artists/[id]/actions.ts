@@ -101,3 +101,11 @@ export async function updateArtistProfile(formData: FormData) {
   await db.from('artists').update(update).eq('id', artistId)
   revalidatePath(`/admin-app/artists/${artistId}`)
 }
+
+export async function deleteArtistAction(formData: FormData) {
+  const artistId = formData.get('artist_id') as string
+  const db = createAdminClient()
+  await db.from('artists').delete().eq('id', artistId)
+  revalidatePath('/admin-app/artists')
+  redirect('/admin-app/artists')
+}

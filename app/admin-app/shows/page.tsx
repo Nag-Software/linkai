@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { AdminHeader } from '@/components/admin/admin-header'
+import { DeleteButton } from '@/components/admin/delete-button'
+import { deleteShowAction } from './actions'
 import type { ShowStatus } from '@/types/database'
 
 const statusColors: Record<ShowStatus, string> = {
@@ -70,6 +72,7 @@ export default async function ShowsPage({
                 <th className="text-left px-4 py-2.5 font-medium">Status</th>
                 <th className="text-center px-4 py-2.5 font-medium">Kapasitet</th>
                 <th className="text-left px-4 py-2.5 font-medium">Pris</th>
+                <th className="px-4 py-2.5" />
               </tr>
             </thead>
             <tbody>
@@ -94,6 +97,14 @@ export default async function ShowsPage({
                     {show.ticket_price
                       ? new Intl.NumberFormat('nb-NO', { style: 'currency', currency: show.currency, maximumFractionDigits: 0 }).format(show.ticket_price / 100)
                       : '—'}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <DeleteButton
+                      action={deleteShowAction}
+                      id={show.id}
+                      idField="show_id"
+                      confirmMessage={`Slett showen "${show.title}"? Dette kan ikke angres.`}
+                    />
                   </td>
                 </tr>
               ))}

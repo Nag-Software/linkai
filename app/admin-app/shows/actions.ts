@@ -385,3 +385,11 @@ export async function confirmLineupAction(formData: FormData) {
   revalidatePath(`/admin-app/shows/${showId}`)
   redirect(`/admin-app/shows/${showId}?tab=marketing`)
 }
+
+export async function deleteShowAction(formData: FormData) {
+  const showId = formData.get('show_id') as string
+  const db = createAdminClient()
+  await db.from('shows').delete().eq('id', showId)
+  revalidatePath('/admin-app/shows')
+  redirect('/admin-app/shows')
+}
