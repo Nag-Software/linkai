@@ -11,10 +11,11 @@ import {
   deleteShowAction,
   generatePosterAction,
   removeSpotAction,
+  sendFallbackOffersAction,
+  startBookingAction,
   updateShowDetailsAction,
   updateRequirementAction,
 } from '../actions'
-import Image from 'next/image'
 
 type ShowTab = 'overview' | 'requirements' | 'booking' | 'lineup' | 'marketing' | 'tickets'
 type LineupMode = 'auto' | 'manual'
@@ -454,9 +455,25 @@ export default async function ShowDetailPage({
             )}
 
             {(requirements ?? []).length > 0 && ['draft', 'booking'].includes(show.status) && (
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                Booking starter automatisk når krav lagres. Nye godkjente artister matches også automatisk mot åpne show.
-              </div>
+              <ToastActionForm
+                action={startBookingAction}
+                successMessage="Booking startet! Tilbud sendes ut til matchende artister."
+                className="rounded-xl border-2 border-primary/30 bg-primary/5 px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+              >
+                <input type="hidden" name="show_id" value={show.id} />
+                <div>
+                  <div className="font-semibold text-sm">Klar til å starte booking?</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    Sender tilbud til godkjente artister som matcher kravene ovenfor.
+                  </div>
+                </div>
+                <button
+                  type="submit"
+                  className="shrink-0 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+                >
+                  Start booking →
+                </button>
+              </ToastActionForm>
             )}
           </div>
         )}
@@ -464,6 +481,28 @@ export default async function ShowDetailPage({
         {/* ══════════════════ BOOKING OFFERS ══════════════════ */}
         {tab === 'booking' && (
           <div className="space-y-6">
+            {['booking', 'draft'].includes(show.status) && (requirements ?? []).length > 0 && (
+              <div className="flex items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3">
+                <div>
+                  <div className="text-sm font-semibold">Fallback-tilbud</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    Sender tilbud til artister som ikke oppfyller alle krav, men er beste tilgjengelige alternativ.
+                  </div>
+                </div>
+                <ToastActionForm
+                  action={sendFallbackOffersAction}
+                  successMessage="Fallback-tilbud sendes i bakgrunnen."
+                >
+                  <input type="hidden" name="show_id" value={show.id} />
+                  <button
+                    type="submit"
+                    className="shrink-0 px-4 py-2 rounded-md border text-sm font-medium hover:bg-muted transition-colors whitespace-nowrap"
+                  >
+                    Send fallback
+                  </button>
+                </ToastActionForm>
+              </div>
+            )}
             {(requirements ?? []).map(req => {
               const reqOffers = (offers ?? []).filter(o => o.show_requirement_id === req.id)
               const fill = reqFillStatus.find(r => r.id === req.id)
@@ -493,11 +532,12 @@ export default async function ShowDetailPage({
                           const artist = artistMap[o.artist_id]
                           return (
                             <tr key={o.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
-                              <td className="px-4 py-3 w-10">
+                              <td className="px-2 py-2 w-10">
                                 {artist?.profile_image_url ? (
-                                  <Image src={artist.profile_image_url} alt="" width={32} height={32} className="size-8 rounded-full object-cover" />
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={artist.profile_image_url} alt="" width={24} height={24} className="size-6 rounded-full object-cover" />
                                 ) : (
-                                  <div className="size-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground">
+                                  <div className="size-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground">
                                     {(artist?.full_name ?? '?').charAt(0)}
                                   </div>
                                 )}

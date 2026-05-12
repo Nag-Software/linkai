@@ -19,7 +19,7 @@ const integrations = [
   {
     group: 'AI',
     items: [
-      { name: 'OpenAI API Key', key: 'OPENAI_API_KEY', envVar: process.env.OPENAI_API_KEY, desc: 'GPT-4 for AI-vurdering' },
+      { name: 'OpenAI API Key', key: 'OPENAI_API_KEY', envVar: process.env.OPENAI_API_KEY, desc: 'AI-vurdering og plakatgenerering' },
     ],
   },
   {

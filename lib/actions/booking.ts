@@ -72,13 +72,16 @@ async function postShowToFacebook(opts: {
 
 /**
  * 6.5 Book show
- * Finds matching artists per requirement, creates booking offers, sends emails.
+ *
+ * Sends offers to ALL strictly qualified candidates simultaneously.
+ * Global dedup: each artist gets at most ONE offer across all requirements.
+ * Hardest-to-fill requirements (fewest candidates) get first pick of shared artists.
+ * Fallback candidates (non-strict) are NOT invited here — use sendFallbackOffersForShow().
  */
 export async function bookShow(showId: string) {
   const admin = createAdminClient()
   let offersCreated = 0
   let candidatesMatched = 0
-  let datePreferenceMatches = 0
 
   // Fetch show
   const { data: show, error: showError } = await admin
@@ -88,7 +91,7 @@ export async function bookShow(showId: string) {
     .single()
   if (showError || !show) throw new Error('Show not found')
   if (!ACTIVE_BOOKING_STATUSES.includes(show.status as (typeof ACTIVE_BOOKING_STATUSES)[number])) {
-    return { offersCreated, candidatesMatched, datePreferenceMatches }
+    return { offersCreated, candidatesMatched }
   }
 
   // Fetch requirements
@@ -97,105 +100,248 @@ export async function bookShow(showId: string) {
     .select('*')
     .eq('show_id', showId)
   if (reqError) throw new Error(reqError.message)
-  if (!requirements?.length) return { offersCreated, candidatesMatched, datePreferenceMatches }
+  if (!requirements?.length) return { offersCreated, candidatesMatched }
 
+  // Artists who marked this date available (tie-breaker)
   const { data: availableRows } = await admin
     .from('artist_availability')
     .select('artist_id')
     .eq('available_date', show.date)
+  const availableSet = new Set((availableRows ?? []).map(r => r.artist_id))
 
-  const availableArtistSet = new Set((availableRows ?? []).map((row) => row.artist_id))
+  // Load all approved, non-flagged artists once
+  const { data: allArtists } = await admin
+    .from('artists')
+    .select('id, email, full_name, admin_score, admin_energy_level, admin_tags')
+    .eq('status', 'approved')
+    .eq('is_flagged', false)
+  if (!allArtists?.length) return { offersCreated, candidatesMatched }
 
-  for (const req of requirements ?? []) {
-    const { count: filledCount } = await admin
+  // Artists already involved in this show
+  const [{ data: existingOffers }, { data: existingSpots }] = await Promise.all([
+    admin.from('booking_offers').select('artist_id').eq('show_id', showId).in('status', ['sent', 'accepted']),
+    admin.from('confirmed_spots').select('artist_id').eq('show_id', showId).in('status', ['confirmed', 'completed', 'paid']),
+  ])
+  const alreadyInvolved = new Set([
+    ...(existingOffers ?? []).map(o => o.artist_id),
+    ...(existingSpots ?? []).map(s => s.artist_id),
+  ])
+
+  type Artist = { id: string; email: string; full_name: string; admin_score: number | null; admin_energy_level: string | null; admin_tags: string[] | null }
+  function rankScore(a: Artist) {
+    return (availableSet.has(a.id) ? 1000 : 0) + (a.admin_score ?? 0)
+  }
+
+  // Build strict candidate lists per requirement
+  type ReqGroup = { req: typeof requirements[number]; slotsNeeded: number; strictCandidates: typeof allArtists }
+  const groups: ReqGroup[] = []
+
+  for (const req of requirements) {
+    const { count: filled } = await admin
       .from('confirmed_spots')
       .select('*', { count: 'exact', head: true })
       .eq('show_requirement_id', req.id)
       .in('status', ['confirmed', 'completed', 'paid'])
 
-    if ((filledCount ?? 0) >= req.quantity) continue
+    const slotsNeeded = req.quantity - (filled ?? 0)
+    if (slotsNeeded <= 0) continue
 
-    // Artists who selected this date are prioritized, but not required.
-    let query = admin
-      .from('artists')
-      .select('id, email, full_name, admin_score')
-      .eq('status', 'approved')
-      .eq('is_flagged', false)
-
-    query = query.gte('admin_score', Math.max(req.min_score ?? MIN_BOOKABLE_SCORE, MIN_BOOKABLE_SCORE))
-
-    if (req.energy_level !== 'any') {
-      query = query.eq('admin_energy_level', req.energy_level)
-    }
-    if (req.required_tags && req.required_tags.length > 0) {
-      query = query.overlaps('admin_tags', req.required_tags)
-    }
-
-    const { data: candidates } = await query
-      .order('admin_score', { ascending: false })
-      .order('full_name', { ascending: true })
-    candidatesMatched += candidates?.length ?? 0
-    datePreferenceMatches += (candidates ?? []).filter((artist) => availableArtistSet.has(artist.id)).length
-    const sortedCandidates = [...(candidates ?? [])].sort((a, b) => {
-      const aAvailable = availableArtistSet.has(a.id) ? 1 : 0
-      const bAvailable = availableArtistSet.has(b.id) ? 1 : 0
-      if (aAvailable !== bAvailable) return bAvailable - aAvailable
-      return (b.admin_score ?? 0) - (a.admin_score ?? 0)
-    })
-
-    const candidateIds = sortedCandidates.map((artist) => artist.id)
-    const [{ data: existingOffers }, { data: existingSpots }] = candidateIds.length > 0
-      ? await Promise.all([
-          admin
-            .from('booking_offers')
-            .select('artist_id')
-            .eq('show_id', showId)
-            .in('artist_id', candidateIds)
-            .in('status', ['sent', 'accepted']),
-          admin
-            .from('confirmed_spots')
-            .select('artist_id')
-            .eq('show_id', showId)
-            .in('artist_id', candidateIds)
-            .in('status', ['confirmed', 'completed', 'paid']),
-        ])
-      : [{ data: [] }, { data: [] }]
-    const artistsWithOffers = new Set((existingOffers ?? []).map((offer) => offer.artist_id))
-    const artistsWithSpots = new Set((existingSpots ?? []).map((spot) => spot.artist_id))
-
-    for (const artist of sortedCandidates) {
-      if (artistsWithOffers.has(artist.id) || artistsWithSpots.has(artist.id)) continue
-
-      const { data: offer, error: offerError } = await admin
-        .from('booking_offers')
-        .insert({
-          show_id: showId,
-          artist_id: artist.id,
-          show_requirement_id: req.id,
-          status: 'sent',
-          sent_at: new Date().toISOString(),
-          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        })
-        .select('token')
-        .single()
-
-      if (offerError || !offer) continue
-      offersCreated += 1
-
-      await sendBookingOfferEmail({
-        email: artist.email,
-        full_name: artist.full_name,
-        show_title: show.title,
-        show_date: show.date,
-        token: offer.token,
-        response_url: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'}/booking-offer/${offer.token}`,
+    const minScore = Math.max(req.min_score ?? MIN_BOOKABLE_SCORE, MIN_BOOKABLE_SCORE)
+    const strictCandidates = allArtists
+      .filter(a => {
+        if (alreadyInvolved.has(a.id)) return false
+        if ((a.admin_score ?? 0) < minScore) return false
+        if (req.energy_level !== 'any' && a.admin_energy_level !== req.energy_level) return false
+        if (req.required_tags?.length) {
+          const tags: string[] = a.admin_tags ?? []
+          if (!req.required_tags.some(t => tags.includes(t))) return false
+        }
+        return true
       })
+      .sort((a, b) => rankScore(b) - rankScore(a))
+
+    groups.push({ req, slotsNeeded, strictCandidates })
+  }
+
+  if (!groups.length) return { offersCreated, candidatesMatched }
+
+  // Hardest-to-fill first (fewest candidates) → gets priority in artist dedup
+  groups.sort((a, b) => a.strictCandidates.length - b.strictCandidates.length)
+
+  // Global dedup: each artist assigned to exactly one requirement
+  const artistReqAssignment = new Map<string, typeof requirements[number]>()
+  for (const group of groups) {
+    for (const artist of group.strictCandidates) {
+      if (!artistReqAssignment.has(artist.id)) {
+        artistReqAssignment.set(artist.id, group.req)
+      }
     }
+  }
+  candidatesMatched = artistReqAssignment.size
+
+  // Send offers — one per artist, to all strict candidates
+  for (const [artistId, req] of artistReqAssignment) {
+    const artist = allArtists.find(a => a.id === artistId)!
+    const { data: offer, error: offerError } = await admin
+      .from('booking_offers')
+      .insert({
+        show_id: showId,
+        artist_id: artist.id,
+        show_requirement_id: req.id,
+        status: 'sent',
+        sent_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      })
+      .select('token')
+      .single()
+
+    if (offerError || !offer) continue
+    offersCreated++
+
+    await sendBookingOfferEmail({
+      email: artist.email,
+      full_name: artist.full_name,
+      show_title: show.title,
+      show_date: show.date,
+      token: offer.token,
+      response_url: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'}/booking-offer/${offer.token}`,
+    })
   }
 
   // Set show to booking status
   await admin.from('shows').update({ status: 'booking' }).eq('id', showId).in('status', ['draft'])
-  return { offersCreated, candidatesMatched, datePreferenceMatches }
+  return { offersCreated, candidatesMatched }
+}
+
+/**
+ * Sends fallback offers: for requirements that still need artists and have no pending sent offers,
+ * invites the best non-strict (fallback) candidates. One offer per artist globally.
+ */
+export async function sendFallbackOffersForShow(showId: string) {
+  const admin = createAdminClient()
+  let offersCreated = 0
+
+  const { data: show } = await admin
+    .from('shows')
+    .select('id, title, date, status')
+    .eq('id', showId)
+    .single()
+  if (!show) throw new Error('Show not found')
+  if (!ACTIVE_BOOKING_STATUSES.includes(show.status as (typeof ACTIVE_BOOKING_STATUSES)[number])) {
+    return { offersCreated }
+  }
+
+  const { data: requirements } = await admin
+    .from('show_requirements')
+    .select('*')
+    .eq('show_id', showId)
+  if (!requirements?.length) return { offersCreated }
+
+  const { data: availableRows } = await admin
+    .from('artist_availability')
+    .select('artist_id')
+    .eq('available_date', show.date)
+  const availableSet = new Set((availableRows ?? []).map(r => r.artist_id))
+
+  const { data: allArtists } = await admin
+    .from('artists')
+    .select('id, email, full_name, admin_score, admin_energy_level, admin_tags')
+    .eq('status', 'approved')
+    .eq('is_flagged', false)
+  if (!allArtists?.length) return { offersCreated }
+
+  const [{ data: existingOffers }, { data: existingSpots }] = await Promise.all([
+    admin.from('booking_offers').select('artist_id').eq('show_id', showId).in('status', ['sent', 'accepted']),
+    admin.from('confirmed_spots').select('artist_id').eq('show_id', showId).in('status', ['confirmed', 'completed', 'paid']),
+  ])
+  const alreadyInvolved = new Set([
+    ...(existingOffers ?? []).map(o => o.artist_id),
+    ...(existingSpots ?? []).map(s => s.artist_id),
+  ])
+
+  type Artist = { id: string; email: string; full_name: string; admin_score: number | null; admin_energy_level: string | null; admin_tags: string[] | null }
+  function rankScore(a: Artist) {
+    return (availableSet.has(a.id) ? 1000 : 0) + (a.admin_score ?? 0)
+  }
+
+  // Build fallback groups for requirements still needing artists
+  type ReqGroup = { req: typeof requirements[number]; slotsNeeded: number; fallbackCandidates: typeof allArtists }
+  const groups: ReqGroup[] = []
+
+  for (const req of requirements) {
+    const { count: filled } = await admin
+      .from('confirmed_spots')
+      .select('*', { count: 'exact', head: true })
+      .eq('show_requirement_id', req.id)
+      .in('status', ['confirmed', 'completed', 'paid'])
+
+    const slotsNeeded = req.quantity - (filled ?? 0)
+    if (slotsNeeded <= 0) continue
+
+    const minScore = Math.max(req.min_score ?? MIN_BOOKABLE_SCORE, MIN_BOOKABLE_SCORE)
+
+    // Only non-strict candidates (would be excluded by strict criteria)
+    const fallbackCandidates = allArtists
+      .filter(a => {
+        if (alreadyInvolved.has(a.id)) return false
+        // Passes if it FAILS at least one strict criterion
+        const failsScore = (a.admin_score ?? 0) < minScore
+        const failsEnergy = req.energy_level !== 'any' && a.admin_energy_level !== req.energy_level
+        const failsTags = (req.required_tags?.length ?? 0) > 0 &&
+          !req.required_tags!.some(t => (a.admin_tags ?? []).includes(t))
+        return failsScore || failsEnergy || failsTags
+      })
+      .sort((a, b) => rankScore(b) - rankScore(a))
+
+    if (fallbackCandidates.length > 0) {
+      groups.push({ req, slotsNeeded, fallbackCandidates })
+    }
+  }
+
+  if (!groups.length) return { offersCreated }
+
+  // Hardest-to-fill first
+  groups.sort((a, b) => a.fallbackCandidates.length - b.fallbackCandidates.length)
+
+  // Global dedup
+  const artistReqAssignment = new Map<string, typeof requirements[number]>()
+  for (const group of groups) {
+    for (const artist of group.fallbackCandidates) {
+      if (!artistReqAssignment.has(artist.id)) {
+        artistReqAssignment.set(artist.id, group.req)
+      }
+    }
+  }
+
+  for (const [artistId, req] of artistReqAssignment) {
+    const artist = allArtists.find(a => a.id === artistId)!
+    const { data: offer, error: offerError } = await admin
+      .from('booking_offers')
+      .insert({
+        show_id: showId,
+        artist_id: artist.id,
+        show_requirement_id: req.id,
+        status: 'sent',
+        sent_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      })
+      .select('token')
+      .single()
+
+    if (offerError || !offer) continue
+    offersCreated++
+
+    await sendBookingOfferEmail({
+      email: artist.email,
+      full_name: artist.full_name,
+      show_title: show.title,
+      show_date: show.date,
+      token: offer.token,
+      response_url: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'}/booking-offer/${offer.token}`,
+    })
+  }
+
+  return { offersCreated }
 }
 
 export async function runAutomaticBookingForShow(showId: string) {

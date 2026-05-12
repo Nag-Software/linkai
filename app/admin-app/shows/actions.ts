@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createShow, updateShowStatus } from '@/lib/actions/shows'
-import { acceptBookingOfferById, automateFullbookedShow, bookShow, cancelConfirmedSpotForOffer, runAutomaticBookingForShow } from '@/lib/actions/booking'
+import { acceptBookingOfferById, automateFullbookedShow, bookShow, cancelConfirmedSpotForOffer, runAutomaticBookingForShow, sendFallbackOffersForShow } from '@/lib/actions/booking'
 import { generateShowPoster } from '@/lib/actions/ai'
 import { runAfterResponse } from '@/lib/background'
 import type { BookingOfferStatus, ConfirmedSpotStatus, RequirementEnergy, ShowStatus } from '@/types/database'
@@ -90,7 +90,22 @@ export async function addRequirementAction(formData: FormData) {
     energy_level: ((formData.get('energy_level') as RequirementEnergy | null) ?? 'any'),
     required_tags: tagsFromForm(formData.get('required_tags')),
   })
-  scheduleShowAutomation(showId, 'add-requirement')
+  revalidatePath(`/admin-app/shows/${showId}`)
+}
+
+export async function startBookingAction(formData: FormData) {
+  const showId = formData.get('show_id') as string
+  scheduleShowAutomation(showId, 'manual-start')
+  revalidatePath(`/admin-app/shows/${showId}`)
+}
+
+export async function sendFallbackOffersAction(formData: FormData) {
+  const showId = formData.get('show_id') as string
+  runAfterResponse(`fallback-offers-${showId}`, async () => {
+    await sendFallbackOffersForShow(showId)
+    revalidatePath(`/admin-app/shows/${showId}`)
+    revalidatePath('/admin-app/bookings')
+  })
   revalidatePath(`/admin-app/shows/${showId}`)
 }
 
@@ -131,7 +146,6 @@ export async function updateRequirementAction(formData: FormData) {
   }).eq('id', reqId)
 
   if (error) throw new Error(error.message)
-  scheduleShowAutomation(showId, 'update-requirement')
   revalidatePath(`/admin-app/shows/${showId}`)
 }
 

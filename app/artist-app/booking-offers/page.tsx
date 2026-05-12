@@ -35,9 +35,11 @@ export default async function BookingOffersPage({
           <CardContent className="grid gap-3">
             {(offers ?? []).map((offer) => {
               const show = showMap.get(offer.show_id)
-              const active = offer.status === 'sent'
+              const today = new Date().toISOString().slice(0, 10)
+              const showPast = show?.date ? show.date < today : false
+              const active = offer.status === 'sent' && !showPast
               return (
-                <div key={offer.id} className="grid gap-3 rounded-lg border p-4 lg:grid-cols-[1fr_auto] lg:items-center">
+                <div key={offer.id} className={`grid gap-3 rounded-lg border p-4 lg:grid-cols-[1fr_auto] lg:items-center${showPast ? ' opacity-50' : ''}`}>
                   <div>
                     <div className="font-medium">{show?.title ?? 'Show'}</div>
                     <div className="text-sm text-muted-foreground">{show?.date ? formatDate(show.date) : 'Dato kommer'} {show?.venue_name ? `· ${show.venue_name}` : ''}</div>

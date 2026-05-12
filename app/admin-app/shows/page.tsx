@@ -3,7 +3,9 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { AdminHeader } from '@/components/admin/admin-header'
 import { DeleteButton } from '@/components/admin/delete-button'
 import { deleteShowAction } from './actions'
-import type { ShowStatus } from '@/types/database'
+import type { Show, ShowStatus } from '@/types/database'
+
+type ShowRow = Pick<Show, 'id' | 'title' | 'date' | 'venue_name' | 'venue_address' | 'status' | 'capacity' | 'ticket_price' | 'currency' | 'published_at' | 'slug'>
 
 const statusColors: Record<ShowStatus, string> = {
   draft: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400',
@@ -31,6 +33,10 @@ export default async function ShowsPage({
   if (status) query = query.eq('status', status as ShowStatus)
 
   const { data: shows } = await query
+
+  const today = new Date().toISOString().slice(0, 10)
+  const upcomingShows = (shows ?? []).filter(s => s.date >= today)
+  const pastShows = (shows ?? []).filter(s => s.date < today)
 
   const statuses: ShowStatus[] = ['draft', 'booking', 'fullbooked', 'published', 'completed', 'cancelled']
 
@@ -62,59 +68,76 @@ export default async function ShowsPage({
           ))}
         </div>
 
-        <div className="rounded-lg border overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/30 text-xs text-muted-foreground">
-                <th className="text-left px-4 py-2.5 font-medium">Tittel</th>
-                <th className="text-left px-4 py-2.5 font-medium">Dato</th>
-                <th className="text-left px-4 py-2.5 font-medium">Sted</th>
-                <th className="text-left px-4 py-2.5 font-medium">Status</th>
-                <th className="text-center px-4 py-2.5 font-medium">Kapasitet</th>
-                <th className="text-left px-4 py-2.5 font-medium">Pris</th>
-                <th className="px-4 py-2.5" />
-              </tr>
-            </thead>
-            <tbody>
-              {(shows ?? []).map((show) => (
-                <tr key={show.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
-                  <td className="px-4 py-3">
-                    <Link href={`/admin-app/shows/${show.id}`} className="font-medium hover:underline">
-                      {show.title}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                    {new Date(show.date).toLocaleDateString('nb-NO', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">{show.venue_name ?? show.venue_address ?? '—'}</td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[show.status]}`}>
-                      {show.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-center">{show.capacity ?? '—'}</td>
-                  <td className="px-4 py-3 text-muted-foreground">
-                    {show.ticket_price
-                      ? new Intl.NumberFormat('nb-NO', { style: 'currency', currency: show.currency, maximumFractionDigits: 0 }).format(show.ticket_price / 100)
-                      : '—'}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <DeleteButton
-                      action={deleteShowAction}
-                      id={show.id}
-                      idField="show_id"
-                      confirmMessage={`Slett showen "${show.title}"? Dette kan ikke angres.`}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {!shows?.length && (
-            <p className="text-center py-12 text-muted-foreground text-sm">Ingen show funnet.</p>
-          )}
-        </div>
+        <section>
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+            Kommende ({upcomingShows.length})
+          </h2>
+          <ShowsTable rows={upcomingShows} />
+        </section>
+        <section>
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+            Tidligere ({pastShows.length})
+          </h2>
+          <ShowsTable rows={pastShows} />
+        </section>
       </div>
+    </div>
+  )
+}
+
+function ShowsTable({ rows }: { rows: ShowRow[] }) {
+  return (
+    <div className="rounded-lg border overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b bg-muted/30 text-xs text-muted-foreground">
+            <th className="text-left px-4 py-2.5 font-medium">Tittel</th>
+            <th className="text-left px-4 py-2.5 font-medium">Dato</th>
+            <th className="text-left px-4 py-2.5 font-medium">Sted</th>
+            <th className="text-left px-4 py-2.5 font-medium">Status</th>
+            <th className="text-center px-4 py-2.5 font-medium">Kapasitet</th>
+            <th className="text-left px-4 py-2.5 font-medium">Pris</th>
+            <th className="px-4 py-2.5" />
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((show) => (
+            <tr key={show.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
+              <td className="px-4 py-3">
+                <Link href={`/admin-app/shows/${show.id}`} className="font-medium hover:underline">
+                  {show.title}
+                </Link>
+              </td>
+              <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                {new Date(show.date).toLocaleDateString('nb-NO', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </td>
+              <td className="px-4 py-3 text-muted-foreground">{show.venue_name ?? show.venue_address ?? '—'}</td>
+              <td className="px-4 py-3">
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[show.status]}`}>
+                  {show.status}
+                </span>
+              </td>
+              <td className="px-4 py-3 text-center">{show.capacity ?? '—'}</td>
+              <td className="px-4 py-3 text-muted-foreground">
+                {show.ticket_price
+                  ? new Intl.NumberFormat('nb-NO', { style: 'currency', currency: show.currency, maximumFractionDigits: 0 }).format(show.ticket_price / 100)
+                  : '—'}
+              </td>
+              <td className="px-4 py-3 text-right">
+                <DeleteButton
+                  action={deleteShowAction}
+                  id={show.id}
+                  idField="show_id"
+                  confirmMessage={`Slett showen "${show.title}"? Dette kan ikke angres.`}
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {!rows.length && (
+        <p className="text-center py-8 text-muted-foreground text-sm">Ingen show.</p>
+      )}
     </div>
   )
 }

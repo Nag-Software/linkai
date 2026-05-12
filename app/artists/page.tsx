@@ -33,7 +33,7 @@ export default async function ArtistsPage() {
           <div className="grid gap-8 md:grid-cols-[1fr_420px] md:items-end">
             <div>
               <div className="mb-5 inline-flex border border-zinc-950 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.22em]">Lineup</div>
-              <h1 className="max-w-3xl text-[clamp(3rem,8vw,6.8rem)] font-black uppercase leading-[0.82] tracking-[-0.04em]">Komikere og artister</h1>
+              <h1 className="max-w-3xl text-[clamp(3rem,8vw,6.8rem)] font-black uppercase leading-[0.82] tracking-[-0.04em]">Våre Komikere</h1>
             </div>
             <div className="grid grid-cols-3 border-2 border-zinc-950 bg-[#fbf7ec] shadow-[6px_6px_0_rgba(24,24,27,0.14)]">
               <Metric value={artists.length.toString()} label="godkjente" />
