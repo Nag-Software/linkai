@@ -6,7 +6,6 @@ import { AdminHeader } from '@/components/admin/admin-header'
 import { ToastActionForm } from '@/components/toast-action-form'
 import { ManualSpotForm } from './manual-spot-form'
 import { DeleteButton } from '@/components/admin/delete-button'
-import { CloneButton } from './clone-button'
 import { shouldBypassImageOptimization } from '@/lib/utils'
 import {
   addRequirementAction,
@@ -20,7 +19,7 @@ import {
   updateRequirementAction,
 } from '../actions'
 
-type ShowTab = 'setup' | 'lineup' | 'publish'
+type ShowTab = 'overview' | 'requirements' | 'lineup' | 'marketing' | 'tickets'
 type LineupMode = 'auto' | 'manual'
 
 export default async function ShowDetailPage({
@@ -31,28 +30,12 @@ export default async function ShowDetailPage({
   searchParams: Promise<{ tab?: ShowTab; mode?: LineupMode }>
 }) {
   const { id } = await params
-  const searchParamsAwaited = await searchParams
-  const rawTab = searchParamsAwaited.tab as string | undefined
-  const mode = searchParamsAwaited.mode as string | undefined
-  const tab = rawTab ?? 'setup'
+  const { tab = 'overview', mode = 'auto' } = await searchParams
   const lineupMode: LineupMode = mode === 'manual' ? 'manual' : 'auto'
-  
-  // Map old tab names to new consolidated tabs for backwards compatibility
-  const tabMapping: Record<string, ShowTab> = {
-    'overview': 'setup',
-    'requirements': 'setup',
-    'booking': 'lineup',
-    'lineup': 'lineup',
-    'marketing': 'publish',
-    'tickets': 'publish',
-    'setup': 'setup',
-    'publish': 'publish',
-  }
-  const mappedTab: ShowTab = (tabMapping[tab] as ShowTab) || 'setup'
   const db = createAdminClient()
-  const shouldLoadTickets = tab === 'tickets' || tab === 'publish'
-  const shouldLoadMarketingTasks = tab === 'marketing' || tab === 'publish'
-  const shouldLoadRelatedArtists = tab === 'booking' || tab === 'lineup' || tab === 'marketing'
+  const shouldLoadTickets = tab === 'tickets'
+  const shouldLoadMarketingTasks = tab === 'marketing'
+  const shouldLoadRelatedArtists = tab === 'lineup' || tab === 'marketing'
   const shouldLoadLineupRequirements = tab === 'lineup'
   const shouldLoadSelectableArtists = tab === 'lineup'
 
@@ -126,9 +109,11 @@ export default async function ShowDetailPage({
   }
 
   const TABS: { key: ShowTab; label: string; badge?: number }[] = [
-    { key: 'setup', label: 'Oppsett' },
-    { key: 'lineup', label: 'Lineup', badge: Math.max(offerStats.sent || 0, activeLineup.length || 0) || undefined },
-    { key: 'publish', label: 'Publiser' },
+    { key: 'overview', label: 'Oversikt' },
+    { key: 'requirements', label: 'Krav' },
+    { key: 'lineup', label: 'Lineup', badge: (offerStats.sent || activeLineup.length) ? Math.max(offerStats.sent, activeLineup.length) : undefined },
+    { key: 'marketing', label: 'Markedsføring' },
+    { key: 'tickets', label: 'Billetter' },
   ]
 
   const STATUS_COLORS: Record<string, string> = {
@@ -172,7 +157,6 @@ export default async function ShowDetailPage({
             <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${SHOW_STATUS_COLORS[show.status]}`}>
               {SHOW_STATUS_LABELS[show.status] ?? show.status}
             </span>
-            <CloneButton show={show} />
             <Link href="/admin-app/shows" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
               ← Tilbake
             </Link>
@@ -193,7 +177,7 @@ export default async function ShowDetailPage({
             key={t.key}
             href={`/admin-app/shows/${id}?tab=${t.key}`}
             className={`relative px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              mappedTab === t.key
+              tab === t.key
                 ? 'border-primary text-foreground'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
@@ -210,8 +194,8 @@ export default async function ShowDetailPage({
 
       <div className="p-6">
 
-        {/* ══════════════════ SETUP (Overview + Requirements) ══════════════════ */}
-        {mappedTab === 'setup' && (
+        {/* ══════════════════ OVERVIEW ══════════════════ */}
+        {tab === 'overview' && (
           <div className="space-y-6">
             {totalSlots > 0 && (
               <div className="rounded-xl border bg-card p-5 space-y-4">
@@ -372,9 +356,9 @@ export default async function ShowDetailPage({
           </div>
         )}
 
-        {/* ══════════════════ SETUP - REQUIREMENTS SECTION ══════════════════ */}
-        {mappedTab === 'setup' && (
-          <div className="mt-8 space-y-6 max-w-3xl border-t pt-6">
+        {/* ══════════════════ REQUIREMENTS ══════════════════ */}
+        {tab === 'requirements' && (
+          <div className="space-y-6 max-w-3xl">
             {reqFillStatus.length > 0 && (
               <div className="space-y-3">
                 {reqFillStatus.map((r) => (
@@ -524,121 +508,12 @@ export default async function ShowDetailPage({
           </div>
         )}
 
-        {/* ══════════════════ LINEUP (Booking Offers + Lineup) ══════════════════ */}
-        {mappedTab === 'lineup' && (
-          <div className="space-y-6">
-            {['booking', 'draft'].includes(show.status) && (requirements ?? []).length > 0 && (
-              <div className="flex items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3">
-                <div>
-                  <div className="text-sm font-semibold">Fallback-tilbud</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">
-                    Sender tilbud til artister som ikke oppfyller alle krav, men er beste tilgjengelige alternativ.
-                  </div>
-                </div>
-                <ToastActionForm
-                  action={sendFallbackOffersAction}
-                  successMessage="Fallback-tilbud sendes i bakgrunnen."
-                >
-                  <input type="hidden" name="show_id" value={show.id} />
-                  <button
-                    type="submit"
-                    className="shrink-0 px-4 py-2 rounded-md border text-sm font-medium hover:bg-muted transition-colors whitespace-nowrap"
-                  >
-                    Send fallback
-                  </button>
-                </ToastActionForm>
-              </div>
-            )}
-            {(requirements ?? []).map(req => {
-              const reqOffers = (offers ?? []).filter(o => o.show_requirement_id === req.id)
-              const fill = reqFillStatus.find(r => r.id === req.id)
-              return (
-                <div key={req.id} className="rounded-xl border bg-card overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/20">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-sm">{req.role_name}</span>
-                      <span className="text-xs text-muted-foreground">{fill?.filled}/{req.quantity} fylt</span>
-                    </div>
-                    <div className="flex gap-1.5">
-                      {[
-                        { key: 'sent', label: 'Venter', color: 'bg-amber-100 text-amber-700' },
-                        { key: 'accepted', label: 'Akseptert', color: 'bg-emerald-100 text-emerald-700' },
-                        { key: 'declined', label: 'Avslått', color: 'bg-red-100 text-red-700' },
-                      ].map(({ key, label, color }) => {
-                        const n = reqOffers.filter(o => o.status === key).length
-                        if (!n) return null
-                        return <span key={key} className={`px-2 py-0.5 rounded-full text-xs font-medium ${color}`}>{n} {label}</span>
-                      })}
-                    </div>
-                  </div>
-                  {reqOffers.length > 0 ? (
-                    <table className="w-full text-sm">
-                      <tbody>
-                        {reqOffers.map(o => {
-                          const artist = artistMap[o.artist_id]
-                          return (
-                            <tr key={o.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
-                              <td className="px-2 py-2 w-10">
-                                {artist?.profile_image_url ? (
-                                  <Image src={artist.profile_image_url} alt="" width={24} height={24} unoptimized={shouldBypassImageOptimization(artist.profile_image_url)} className="size-6 rounded-full object-cover" />
-                                ) : (
-                                  <div className="size-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground">
-                                    {(artist?.full_name ?? '?').charAt(0)}
-                                  </div>
-                                )}
-                              </td>
-                              <td className="px-2 py-3">
-                                <div className="font-medium">{artist?.full_name ?? '—'}</div>
-                                <div className="text-xs text-muted-foreground">{artist?.email}</div>
-                              </td>
-                              <td className="px-4 py-3">
-                                <span className={`px-2 py-1 rounded-md text-xs font-medium ${STATUS_COLORS[o.status] ?? 'bg-muted text-muted-foreground'}`}>
-                                  {o.status.replaceAll('_', ' ')}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
-                                Sendt {o.sent_at ? new Date(o.sent_at).toLocaleDateString('nb-NO') : '—'}
-                              </td>
-                              <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
-                                {o.responded_at && `Svart ${new Date(o.responded_at).toLocaleDateString('nb-NO')}`}
-                              </td>
-                              <td className="px-4 py-3 text-right text-xs text-muted-foreground">Auto</td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  ) : (
-                    <p className="text-sm text-muted-foreground px-4 py-6">Ingen tilbud for denne rollen ennå.</p>
-                  )}
-                </div>
-              )
-            })}
-            {!(offers ?? []).length && (
-              <div className="rounded-xl border border-dashed p-12 text-center text-muted-foreground text-sm">
-                Ingen tilbud sendt ennå.
-                {show.status === 'draft' && (
-                  <div className="mt-3">
-                    <Link href={`/admin-app/shows/${id}?tab=requirements`} className="text-primary underline-offset-2 hover:underline text-sm">
-                      Sett opp krav og start booking
-                    </Link>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+        {/* ══════════════════ LINEUP ══════════════════ */}
+        {tab === 'lineup' && (
+          <div className="space-y-5">
 
-        {/* ══════════════════ LINEUP - CONFIRMED SPOTS SECTION ══════════════════ */}
-        {mappedTab === 'lineup' && (
-          <div className="mt-8 space-y-6 border-t pt-6">
-            <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h2 className="text-sm font-semibold">Lineup-modus</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Auto er standard. Bruk manuell modus når admin selv vil fylle eller justere lineup.
-                </p>
-              </div>
+            {/* Controls row */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex rounded-md border bg-muted/40 p-1">
                 <Link
                   href={`/admin-app/shows/${id}?tab=lineup&mode=auto`}
@@ -653,125 +528,263 @@ export default async function ShowDetailPage({
                   Manuell
                 </Link>
               </div>
+              {['booking', 'draft'].includes(show.status) && (requirements ?? []).length > 0 && (
+                <ToastActionForm
+                  action={sendFallbackOffersAction}
+                  successMessage="Fallback-tilbud sendes i bakgrunnen."
+                >
+                  <input type="hidden" name="show_id" value={show.id} />
+                  <button
+                    type="submit"
+                    className="shrink-0 px-3 py-1.5 rounded-md border text-sm font-medium hover:bg-muted transition-colors whitespace-nowrap"
+                  >
+                    Send fallback-tilbud
+                  </button>
+                </ToastActionForm>
+              )}
             </div>
 
-            {reqFillStatus.length > 0 && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {reqFillStatus.map(r => (
-                  <div key={r.id} className={`rounded-xl border p-3 text-center ${r.isFull ? 'border-emerald-300 bg-emerald-50/50' : 'border-amber-200 bg-amber-50/50'}`}>
-                    <div className={`text-2xl font-bold ${r.isFull ? 'text-emerald-700' : 'text-amber-700'}`}>{r.filled}/{r.quantity}</div>
-                    <div className="text-xs font-medium mt-0.5">{r.role_name}</div>
-                    <div className="text-[10px] text-muted-foreground">{r.isFull ? 'Fylt' : `${r.pendingOffers} venter svar`}</div>
+            {/* Per-requirement cards — lineup + tilbud integrert */}
+            {(requirements ?? []).map(req => {
+              const fill = reqFillStatus.find(r => r.id === req.id)!
+              const confirmedSpots = (lineup ?? []).filter(
+                s => s.show_requirement_id === req.id && ['confirmed', 'completed', 'paid'].includes(s.status)
+              )
+              const pendingOffers = (offers ?? []).filter(
+                o => o.show_requirement_id === req.id && o.status === 'sent'
+              )
+              const declinedOffers = (offers ?? []).filter(
+                o => o.show_requirement_id === req.id && ['declined', 'expired', 'filled_by_other', 'cancelled'].includes(o.status)
+              )
+              const hasRows = confirmedSpots.length > 0 || pendingOffers.length > 0
+
+              return (
+                <div key={req.id} className="rounded-xl border bg-card overflow-hidden">
+                  {/* Requirement header */}
+                  <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/20">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className="font-semibold text-sm">{req.role_name}</span>
+                      <div className="flex gap-1">
+                        {Array.from({ length: req.quantity }).map((_, i) => (
+                          <div
+                            key={i}
+                            className={`size-3.5 rounded-sm ${
+                              i < fill.filled
+                                ? 'bg-emerald-500'
+                                : i < fill.filled + fill.pendingOffers
+                                ? 'bg-amber-400'
+                                : 'bg-muted-foreground/20'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${fill.isFull ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {fill.isFull ? '✓ Fylt' : `${fill.filled}/${req.quantity}`}
+                      </span>
+                      {pendingOffers.length > 0 && (
+                        <span className="text-xs text-amber-600 font-medium">
+                          {pendingOffers.length} venter svar
+                        </span>
+                      )}
+                    </div>
+                    {declinedOffers.length > 0 && (
+                      <span className="text-xs text-muted-foreground shrink-0">
+                        {declinedOffers.length} avslått
+                      </span>
+                    )}
                   </div>
-                ))}
-              </div>
-            )}
 
-            {lineupMode === 'auto' && (requirements ?? []).length > 0 && (
-              <div className="rounded-xl border bg-card p-5 space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <h2 className="font-semibold text-sm">Automatisk lineup</h2>
-                  <span className="text-xs text-muted-foreground">{selectableArtists?.length ?? 0} godkjente artister</span>
+                  {/* Rows */}
+                  {hasRows && (
+                    <div className="divide-y">
+                      {confirmedSpots.map(spot => {
+                        const artist = artistMap[spot.artist_id]
+                        return (
+                          <div key={spot.id} className="flex items-center gap-3 px-4 py-3 border-l-2 border-l-emerald-500 bg-emerald-50/20 dark:bg-emerald-950/10">
+                            {artist?.profile_image_url ? (
+                              <Image
+                                src={artist.profile_image_url}
+                                alt=""
+                                width={36}
+                                height={36}
+                                unoptimized={shouldBypassImageOptimization(artist.profile_image_url)}
+                                className="size-9 rounded-full object-cover shrink-0"
+                              />
+                            ) : (
+                              <div className="size-9 rounded-full bg-emerald-100 dark:bg-emerald-900 flex items-center justify-center text-sm font-bold text-emerald-700 dark:text-emerald-300 shrink-0">
+                                {(artist?.full_name ?? '?').charAt(0)}
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <Link
+                                  href={`/admin-app/artists/${spot.artist_id}`}
+                                  className="font-semibold text-sm truncate hover:underline underline-offset-2"
+                                >
+                                  {artist?.full_name ?? '—'}
+                                </Link>
+                                {artist?.admin_score != null && (
+                                  <span className="text-xs text-muted-foreground shrink-0">⭐ {artist.admin_score}</span>
+                                )}
+                              </div>
+                              <div className="text-xs text-muted-foreground truncate">{artist?.email}</div>
+                            </div>
+                            <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[spot.status] ?? ''}`}>
+                              {spot.status}
+                            </span>
+                            <span className="shrink-0 text-xs text-muted-foreground tabular-nums min-w-[60px] text-right">
+                              {spot.fee_amount ? `${spot.fee_amount / 100} ${spot.currency ?? show.currency}` : '—'}
+                            </span>
+                            {lineupMode === 'manual' ? (
+                              <ToastActionForm action={removeSpotAction}>
+                                <input type="hidden" name="spot_id" value={spot.id} />
+                                <input type="hidden" name="show_id" value={show.id} />
+                                <button
+                                  type="submit"
+                                  className="shrink-0 rounded border px-2 py-1 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10"
+                                >
+                                  Fjern
+                                </button>
+                              </ToastActionForm>
+                            ) : (
+                              <div className="w-[46px] shrink-0" />
+                            )}
+                          </div>
+                        )
+                      })}
+
+                      {pendingOffers.map(o => {
+                        const artist = artistMap[o.artist_id]
+                        return (
+                          <div key={o.id} className="flex items-center gap-3 px-4 py-2.5 border-l-2 border-l-amber-400 bg-amber-50/30 dark:bg-amber-950/10">
+                            {artist?.profile_image_url ? (
+                              <Image
+                                src={artist.profile_image_url}
+                                alt=""
+                                width={36}
+                                height={36}
+                                unoptimized={shouldBypassImageOptimization(artist.profile_image_url)}
+                                className="size-9 rounded-full object-cover shrink-0 opacity-70"
+                              />
+                            ) : (
+                              <div className="size-9 rounded-full bg-amber-100 dark:bg-amber-900 flex items-center justify-center text-sm font-bold text-amber-600 dark:text-amber-300 shrink-0">
+                                {(artist?.full_name ?? '?').charAt(0)}
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <Link
+                                  href={`/admin-app/artists/${o.artist_id}`}
+                                  className="text-sm truncate text-muted-foreground hover:underline underline-offset-2"
+                                >
+                                  {artist?.full_name ?? '—'}
+                                </Link>
+                                {artist?.admin_score != null && (
+                                  <span className="text-xs text-muted-foreground/60 shrink-0">⭐ {artist.admin_score}</span>
+                                )}
+                              </div>
+                              <div className="text-xs text-muted-foreground/60 truncate">{artist?.email}</div>
+                            </div>
+                            <span className="shrink-0 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
+                              Venter svar
+                            </span>
+                            <span className="shrink-0 text-xs text-muted-foreground tabular-nums min-w-[60px] text-right">
+                              {o.sent_at ? new Date(o.sent_at).toLocaleDateString('nb-NO') : '—'}
+                            </span>
+                            <div className="w-[46px] shrink-0" />
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  {!hasRows && (
+                    <p className="px-4 py-5 text-sm text-muted-foreground">
+                      {show.status === 'draft'
+                        ? 'Start booking for å sende tilbud til artister.'
+                        : 'Ingen aktive tilbud eller bekreftede artister ennå.'}
+                    </p>
+                  )}
+
+                  {/* Manual add form — per requirement, only if mode=manual and slots open */}
+                  {lineupMode === 'manual' && fill.filled < req.quantity && manualSelectableArtists.length > 0 && (
+                    <div className="border-t bg-muted/10 px-4 py-4">
+                      <p className="text-xs font-medium text-muted-foreground mb-3">Legg til artist manuelt</p>
+                      <ManualSpotForm
+                        showId={show.id}
+                        currency={show.currency}
+                        artists={manualSelectableArtists}
+                        requirements={[{ id: req.id, role_name: req.role_name, quantity: req.quantity, filled: fill.filled }]}
+                      />
+                    </div>
+                  )}
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Systemet sender tilbud til matchende artister. Lineup fylles når artister godkjenner tilbudet.
-                </p>
-              </div>
-            )}
+              )
+            })}
 
-            {lineupMode === 'manual' && (
-              <div className="rounded-xl border bg-card p-5 space-y-4">
-                <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <h2 className="font-semibold text-sm">Legg til artist manuelt</h2>
-                    <p className="text-sm text-muted-foreground">Manuell lineup bruker samme sikkerhetsregler: én artist per show og bare åpne roller kan fylles.</p>
+            {/* Unassigned offers */}
+            {(() => {
+              const unassigned = (offers ?? []).filter(o => !o.show_requirement_id)
+              if (!unassigned.length) return null
+              return (
+                <div className="rounded-xl border bg-card overflow-hidden">
+                  <div className="px-4 py-3 border-b bg-muted/20 flex items-center gap-2">
+                    <span className="font-semibold text-sm">Øvrige tilbud</span>
+                    <span className="text-xs text-muted-foreground">Ikke tilknyttet krav</span>
                   </div>
-                  <span className="text-xs text-muted-foreground">{manualSelectableArtists.length} tilgjengelige artister</span>
+                  <div className="divide-y">
+                    {unassigned.map(o => {
+                      const artist = artistMap[o.artist_id]
+                      return (
+                        <div key={o.id} className="flex items-center gap-3 px-4 py-3">
+                          <div className="flex-1 text-sm font-medium">{artist?.full_name ?? '—'}</div>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[o.status] ?? 'bg-muted text-muted-foreground'}`}>
+                            {o.status.replaceAll('_', ' ')}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {o.sent_at ? new Date(o.sent_at).toLocaleDateString('nb-NO') : '—'}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
-                {manualOpenRequirements.length > 0 ? (
-                  <ManualSpotForm
-                    showId={show.id}
-                    currency={show.currency}
-                    artists={manualSelectableArtists}
-                    requirements={manualOpenRequirements}
-                  />
-                ) : (
-                  <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">Alle krav er fylt. Øk antall på et krav hvis du vil legge til flere.</div>
-                )}
+              )
+            })()}
+
+            {/* Empty state */}
+            {(requirements ?? []).length === 0 && (
+              <div className="rounded-xl border border-dashed p-12 text-center text-muted-foreground text-sm">
+                Ingen krav definert ennå.
+                <div className="mt-3">
+                  <Link
+                    href={`/admin-app/shows/${id}?tab=requirements`}
+                    className="text-primary underline-offset-2 hover:underline text-sm"
+                  >
+                    Sett opp bookingkrav
+                  </Link>
+                </div>
               </div>
             )}
 
+            {/* All-filled celebration */}
             {allSlotsFilled && show.status === 'booking' && (
               <div className="rounded-xl border-2 border-purple-300 bg-purple-50/50 dark:bg-purple-950/20 p-5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
                     <h3 className="font-bold text-purple-900 dark:text-purple-300">Lineup er klar! 🎉</h3>
                     <p className="text-sm text-purple-700 dark:text-purple-400 mt-0.5">
-                      Alle plasser er fylt. Systemet genererer lineup-plakat med profilbilder, publiserer eventside og starter markedsføring automatisk.
+                      Alle plasser er fylt. Systemet genererer lineup-plakat, publiserer eventside og starter markedsføring automatisk.
                     </p>
                   </div>
                 </div>
               </div>
             )}
-
-            {activeLineup.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {activeLineup.map(spot => {
-                  const artist = artistMap[spot.artist_id]
-                  const req = spot.show_requirement_id ? reqMap[spot.show_requirement_id] : null
-                  return (
-                    <div key={spot.id} className="rounded-xl border bg-card overflow-hidden">
-                      <div className="flex items-center gap-3 p-4">
-                        {artist?.profile_image_url ? (
-                          <Image src={artist.profile_image_url} alt="" width={56} height={56} unoptimized={shouldBypassImageOptimization(artist.profile_image_url)} className="size-14 rounded-full object-cover shrink-0" />
-                        ) : (
-                          <div className="size-14 rounded-full bg-muted flex items-center justify-center text-xl font-bold text-muted-foreground shrink-0">
-                            {(artist?.full_name ?? '?').charAt(0)}
-                          </div>
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <div className="font-semibold truncate">{artist?.full_name ?? '—'}</div>
-                          <div className="text-xs text-muted-foreground truncate">{artist?.email}</div>
-                          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                            {req && <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium">{req.role_name}</span>}
-                            {artist?.admin_score != null && <span className="px-2 py-0.5 rounded-full bg-muted text-xs font-bold">⭐ {artist.admin_score}</span>}
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[spot.status] ?? ''}`}>{spot.status}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between gap-3 px-4 pb-4 text-xs text-muted-foreground">
-                        <span>{spot.fee_amount ? `Fee: ${spot.fee_amount / 100} ${spot.currency}` : 'Fee ikke satt'}</span>
-                        {lineupMode === 'manual' && (
-                          <ToastActionForm action={removeSpotAction}>
-                            <input type="hidden" name="spot_id" value={spot.id} />
-                            <input type="hidden" name="show_id" value={show.id} />
-                            <button type="submit" className="rounded-md border px-2 py-1 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10">
-                              Fjern
-                            </button>
-                          </ToastActionForm>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <div className="rounded-xl border border-dashed p-12 text-center text-muted-foreground text-sm">
-                Ingen bekreftet lineup ennå.
-                {show.status === 'draft' && (
-                  <div className="mt-3">
-                    <Link href={`/admin-app/shows/${id}?tab=requirements`} className="text-primary underline-offset-2 hover:underline text-sm">
-                      Start bookingprosessen
-                    </Link>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         )}
 
-        {/* ══════════════════ PUBLISH (Marketing + Tickets) ══════════════════ */}
-        {mappedTab === 'publish' && (
+        {/* ══════════════════ MARKETING ══════════════════ */}
+        {tab === 'marketing' && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="rounded-xl border bg-card p-5 space-y-3">
@@ -848,10 +861,22 @@ export default async function ShowDetailPage({
           </div>
         )}
 
-        {/* ══════════════════ PUBLISH - TICKETS SECTION ══════════════════ */}
-        {mappedTab === 'publish' && (
-          <div className="mt-8 space-y-6 border-t pt-6">
-            <div className="rounded-lg border overflow-x-auto">
+        {/* ══════════════════ TICKETS ══════════════════ */}
+        {tab === 'tickets' && (
+          <>
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm font-semibold text-muted-foreground">
+              {tickets?.length ?? 0} billetter
+            </p>
+            <Link
+              href={`/admin-app/scanner/${id}`}
+              target="_blank"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors"
+            >
+              📷 Åpne scanner
+            </Link>
+          </div>
+          <div className="rounded-lg border overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-muted/30 border-b text-xs text-muted-foreground">
@@ -873,8 +898,8 @@ export default async function ShowDetailPage({
             {!tickets?.length && (
               <p className="text-center py-12 text-muted-foreground text-sm">Ingen billetter solgt ennå.</p>
             )}
-            </div>
           </div>
+          </>
         )}
       </div>
     </div>

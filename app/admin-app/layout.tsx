@@ -40,6 +40,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     redirect(`${adminPrefix}/login?error=unauthorized`)
   }
 
+  if (pathname.startsWith('/admin-app/scanner')) {
+    return <>{children}</>
+  }
+
   return (
     <SidebarProvider>
       <AdminSidebar user={sidebarUser} />
