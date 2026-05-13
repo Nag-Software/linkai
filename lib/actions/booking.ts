@@ -109,10 +109,28 @@ export async function bookShow(showId: string) {
     .eq('available_date', show.date)
   const availableSet = new Set((availableRows ?? []).map(r => r.artist_id))
 
+  // Last confirmed booking date per artist (for recency priority)
+  const { data: recentSpotRows } = await admin
+    .from('confirmed_spots')
+    .select('artist_id, show_id')
+    .in('status', ['confirmed', 'completed', 'paid'])
+  const spotShowIds = [...new Set((recentSpotRows ?? []).map(s => s.show_id))]
+  const spotShowDatesResult = spotShowIds.length
+    ? await admin.from('shows').select('id, date').in('id', spotShowIds)
+    : { data: [] as Array<{ id: string; date: string }> }
+  const showDateMap = Object.fromEntries((spotShowDatesResult.data ?? []).map((s: { id: string; date: string }) => [s.id, s.date]))
+  const lastBookedMap = new Map<string, string>()
+  for (const row of recentSpotRows ?? []) {
+    const d = showDateMap[row.show_id]
+    if (!d) continue
+    const existing = lastBookedMap.get(row.artist_id)
+    if (!existing || d > existing) lastBookedMap.set(row.artist_id, d)
+  }
+
   // Load all approved, non-flagged artists once
   const { data: allArtists } = await admin
     .from('artists')
-    .select('id, email, full_name, admin_score, admin_energy_level, admin_tags')
+    .select('id, email, full_name, admin_score, admin_energy_level, admin_tags, gender')
     .eq('status', 'approved')
     .eq('is_flagged', false)
   if (!allArtists?.length) return { offersCreated, candidatesMatched }
@@ -127,9 +145,16 @@ export async function bookShow(showId: string) {
     ...(existingSpots ?? []).map(s => s.artist_id),
   ])
 
-  type Artist = { id: string; email: string; full_name: string; admin_score: number | null; admin_energy_level: string | null; admin_tags: string[] | null }
+  type Artist = { id: string; email: string; full_name: string; admin_score: number | null; admin_energy_level: string | null; admin_tags: string[] | null; gender: string | null }
+  const today = new Date().toISOString().slice(0, 10)
+  function recencyBonus(artistId: string): number {
+    const lastDate = lastBookedMap.get(artistId)
+    if (!lastDate) return 50 // never booked → max bonus
+    const days = Math.max(0, Math.floor((new Date(today).getTime() - new Date(lastDate).getTime()) / 86400000))
+    return Math.min(days, 90) / 90 * 50
+  }
   function rankScore(a: Artist) {
-    return (availableSet.has(a.id) ? 1000 : 0) + (a.admin_score ?? 0)
+    return (availableSet.has(a.id) ? 1000 : 0) + (a.admin_score ?? 0) + recencyBonus(a.id)
   }
 
   // Build strict candidate lists per requirement
@@ -152,6 +177,7 @@ export async function bookShow(showId: string) {
         if (alreadyInvolved.has(a.id)) return false
         if ((a.admin_score ?? 0) < minScore) return false
         if (req.energy_level !== 'any' && a.admin_energy_level !== req.energy_level) return false
+        if (req.required_gender && req.required_gender !== 'any' && a.gender !== req.required_gender) return false
         if (req.required_tags?.length) {
           const tags: string[] = a.admin_tags ?? []
           if (!req.required_tags.some(t => tags.includes(t))) return false
@@ -245,7 +271,7 @@ export async function sendFallbackOffersForShow(showId: string) {
 
   const { data: allArtists } = await admin
     .from('artists')
-    .select('id, email, full_name, admin_score, admin_energy_level, admin_tags')
+    .select('id, email, full_name, admin_score, admin_energy_level, admin_tags, gender')
     .eq('status', 'approved')
     .eq('is_flagged', false)
   if (!allArtists?.length) return { offersCreated }
@@ -259,9 +285,34 @@ export async function sendFallbackOffersForShow(showId: string) {
     ...(existingSpots ?? []).map(s => s.artist_id),
   ])
 
-  type Artist = { id: string; email: string; full_name: string; admin_score: number | null; admin_energy_level: string | null; admin_tags: string[] | null }
+  // Last confirmed booking date per artist (for recency priority)
+  const { data: recentSpotRowsFb } = await admin
+    .from('confirmed_spots')
+    .select('artist_id, show_id')
+    .in('status', ['confirmed', 'completed', 'paid'])
+  const fbSpotShowIds = [...new Set((recentSpotRowsFb ?? []).map(s => s.show_id))]
+  const fbSpotShowDatesResult = fbSpotShowIds.length
+    ? await admin.from('shows').select('id, date').in('id', fbSpotShowIds)
+    : { data: [] as Array<{ id: string; date: string }> }
+  const fbShowDateMap = Object.fromEntries((fbSpotShowDatesResult.data ?? []).map((s: { id: string; date: string }) => [s.id, s.date]))
+  const fbLastBookedMap = new Map<string, string>()
+  for (const row of recentSpotRowsFb ?? []) {
+    const d = fbShowDateMap[row.show_id]
+    if (!d) continue
+    const existing = fbLastBookedMap.get(row.artist_id)
+    if (!existing || d > existing) fbLastBookedMap.set(row.artist_id, d)
+  }
+
+  type Artist = { id: string; email: string; full_name: string; admin_score: number | null; admin_energy_level: string | null; admin_tags: string[] | null; gender: string | null }
+  const todayFb = new Date().toISOString().slice(0, 10)
+  function recencyBonusFb(artistId: string): number {
+    const lastDate = fbLastBookedMap.get(artistId)
+    if (!lastDate) return 50
+    const days = Math.max(0, Math.floor((new Date(todayFb).getTime() - new Date(lastDate).getTime()) / 86400000))
+    return Math.min(days, 90) / 90 * 50
+  }
   function rankScore(a: Artist) {
-    return (availableSet.has(a.id) ? 1000 : 0) + (a.admin_score ?? 0)
+    return (availableSet.has(a.id) ? 1000 : 0) + (a.admin_score ?? 0) + recencyBonusFb(a.id)
   }
 
   // Build fallback groups for requirements still needing artists

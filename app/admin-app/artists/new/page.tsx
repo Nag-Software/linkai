@@ -10,8 +10,8 @@ export default function NewArtistPage() {
   return (
     <div>
       <AdminHeader
-        title="Ny artist"
-        description="Opprett en ny artistkonto manuelt"
+        title="Ny komiker"
+        description="Opprett en ny komikerkonto manuelt"
         actions={
           <Link href="/admin-app/artists" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
             ← Tilbake
@@ -20,7 +20,7 @@ export default function NewArtistPage() {
       />
       <div className="p-6 max-w-xl">
         <section className="rounded-xl border bg-card p-6">
-          <ToastActionForm action={createArtistAction} className="space-y-4" successMessage="Artist opprettet!">
+          <ToastActionForm action={createArtistAction} className="space-y-4" successMessage="Komiker opprettet!">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="full_name">Fullt navn *</Label>

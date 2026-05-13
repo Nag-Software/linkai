@@ -31,12 +31,12 @@ import {
 
 const navItems = [
   { label: 'Dashboard', href: '/', icon: LayoutDashboard, exact: true },
-  { label: 'Artists', href: '/artists', icon: Users },
+  { label: 'Komikere', href: '/artists', icon: Users },
   { label: 'Shows', href: '/shows', icon: CalendarDays },
   { label: 'Bookings', href: '/bookings', icon: BookOpen },
   { label: 'Orders', href: '/orders', icon: ShoppingCart },
   { label: 'Tickets', href: '/tickets', icon: Ticket },
-  { label: 'Artist Economy', href: '/artist-economy', icon: Wallet },
+  { label: 'Komiker Economy', href: '/artist-economy', icon: Wallet },
   { label: 'Marketing', href: '/marketing', icon: Megaphone },
   { label: 'Email Logs', href: '/email-logs', icon: Mail },
   { label: 'Tracking', href: '/tracking', icon: Radar },

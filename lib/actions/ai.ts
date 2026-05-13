@@ -29,6 +29,47 @@ type PosterReferencePackage = {
   identityLines: string[]
 }
 
+const artistAiAssessmentSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: [
+    'ai_score_suggestion',
+    'ai_energy_suggestion',
+    'ai_experience_level',
+    'ai_confidence',
+    'ai_tags_suggestion',
+    'ai_summary',
+    'ai_reasoning',
+    'ai_uncertainties',
+    'ai_sources',
+  ],
+  properties: {
+    ai_score_suggestion: { type: 'integer', minimum: 1, maximum: 10 },
+    ai_energy_suggestion: { type: 'string', enum: ['high', 'low', 'uncertain'] },
+    ai_experience_level: { type: 'string', enum: ['new', 'emerging', 'established', 'headliner', 'uncertain'] },
+    ai_confidence: { type: 'string', enum: ['low', 'medium', 'high'] },
+    ai_tags_suggestion: {
+      type: 'array',
+      items: { type: 'string' },
+    },
+    ai_summary: { type: 'string' },
+    ai_reasoning: { type: 'string' },
+    ai_uncertainties: { type: 'string' },
+    ai_sources: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['url', 'description'],
+        properties: {
+          url: { type: 'string' },
+          description: { type: 'string' },
+        },
+      },
+    },
+  },
+} as const
+
 export async function generateShowPoster(showId: string, opts: {
   title: string
   date: string
@@ -421,17 +462,25 @@ Basert på offentlig tilgjengelig informasjon og dataene over, gi:
 `.trim()
 
   try {
-    const completion = await getOpenAI().chat.completions.create({
+    const response = await getOpenAI().responses.create({
       model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      response_format: { type: 'json_object' },
+      instructions: systemPrompt,
+      input: userPrompt,
+      text: {
+        format: {
+          type: 'json_schema',
+          name: 'artist_ai_assessment',
+          description: 'Structured assessment suggestions for an artist profile.',
+          schema: artistAiAssessmentSchema,
+          strict: true,
+        },
+        verbosity: 'low',
+      },
+      store: true,
       temperature: 0.3,
     })
 
-    const content = completion.choices[0]?.message?.content
+    const content = response.output_text
     if (!content) throw new Error('Empty OpenAI response')
 
     const result = JSON.parse(content)

@@ -67,8 +67,8 @@ export default async function ArtistsPage({
   return (
     <div>
       <AdminHeader
-        title="Artister"
-        description={`${artists?.length ?? 0} artister`}
+        title="Komikere"
+        description={`${artists?.length ?? 0} komikere`}
         actions={
           <div className="flex items-center gap-3">
             <Link
@@ -81,7 +81,7 @@ export default async function ArtistsPage({
               href="/admin-app/artists/new"
               className="text-xs bg-primary text-primary-foreground rounded-md px-3 py-1.5 hover:bg-primary/90 transition-colors"
             >
-              + Ny artist
+              + Ny komiker
             </Link>
           </div>
         }
@@ -130,7 +130,7 @@ export default async function ArtistsPage({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/30 text-xs text-muted-foreground">
-                <th className="text-left px-4 py-2.5 font-medium">Artist</th>
+                <th className="text-left px-4 py-2.5 font-medium">Komiker</th>
                 <th className="text-left px-4 py-2.5 font-medium">E-post</th>
                 <th className="text-left px-4 py-2.5 font-medium">Status</th>
                 <th className="text-center px-4 py-2.5 font-medium">Score</th>
@@ -209,7 +209,7 @@ export default async function ArtistsPage({
             </tbody>
           </table>
           {!artists?.length && (
-            <p className="text-center py-12 text-muted-foreground text-sm">Ingen artister funnet.</p>
+            <p className="text-center py-12 text-muted-foreground text-sm">Ingen komikere funnet.</p>
           )}
         </div>
       </div>

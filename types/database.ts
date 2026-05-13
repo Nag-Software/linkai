@@ -2,7 +2,10 @@
 
 export type Role = 'owner' | 'admin' | 'staff' | 'artist'
 export type ArtistStatus = 'pending_review' | 'approved' | 'rejected' | 'inactive' | 'flagged'
-export type EnergyLevel = 'high' | 'low' | 'uncertain'
+export type ArtistGender = 'male' | 'female' | 'other'
+export type RequirementGender = 'male' | 'female' | 'any'
+export type EnergyLevel = 'high' | 'medium' | 'low' | 'uncertain'
+export type ArtistType = 'headliner' | 'konferansier' | 'klubbkomiker' | 'open_mic'
 export type AiStatus = 'pending' | 'completed' | 'failed'
 export type AiConfidence = 'low' | 'medium' | 'high'
 export type ShowStatus = 'draft' | 'booking' | 'fullbooked' | 'published' | 'completed' | 'cancelled'
@@ -51,9 +54,11 @@ export type Artist = {
   language: string | null
   social_links: Record<string, string> | null
   consent_ai_research: boolean
+  gender: ArtistGender | null
   status: ArtistStatus
   admin_score: number | null
   admin_energy_level: EnergyLevel | null
+  admin_type: ArtistType[] | null
   admin_tags: string[] | null
   admin_notes: string | null
   is_flagged: boolean
@@ -106,6 +111,7 @@ export type Show = {
   status: ShowStatus
   stripe_product_id: string | null
   stripe_price_id: string | null
+  is_template: boolean
   published_at: string | null
   created_at: string
   updated_at: string
@@ -118,6 +124,7 @@ export type ShowRequirement = {
   quantity: number
   min_score: number | null
   energy_level: RequirementEnergy
+  required_gender: RequirementGender
   required_tags: string[] | null
   created_at: string
   updated_at: string

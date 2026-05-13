@@ -7,7 +7,7 @@ import { createShow, updateShowStatus } from '@/lib/actions/shows'
 import { acceptBookingOfferById, automateFullbookedShow, bookShow, cancelConfirmedSpotForOffer, runAutomaticBookingForShow, sendFallbackOffersForShow } from '@/lib/actions/booking'
 import { generateShowPoster } from '@/lib/actions/ai'
 import { runAfterResponse } from '@/lib/background'
-import type { BookingOfferStatus, ConfirmedSpotStatus, RequirementEnergy, ShowStatus } from '@/types/database'
+import type { BookingOfferStatus, ConfirmedSpotStatus, RequirementEnergy, RequirementGender, ShowStatus } from '@/types/database'
 
 export type ManualSpotActionState = {
   status: 'idle' | 'success' | 'error'
@@ -79,6 +79,78 @@ export async function createShowAction(formData: FormData) {
   redirect(`/admin-app/shows/${show.id}`)
 }
 
+export async function cloneShowAction(formData: FormData) {
+  const templateId = formData.get('template_id') as string
+  const db = createAdminClient()
+
+  // Create the new show
+  const show = await createShow({
+    title: formData.get('title') as string,
+    slug: formData.get('slug') as string,
+    date: formData.get('date') as string,
+    start_time: optionalText(formData.get('start_time')) ?? undefined,
+    end_time: optionalText(formData.get('end_time')) ?? undefined,
+    venue_address: optionalText(formData.get('venue_address')) ?? undefined,
+    capacity: optionalInteger(formData.get('capacity')) ?? undefined,
+    ticket_price: optionalMoneyToMinor(formData.get('ticket_price')) ?? undefined,
+    currency: optionalText(formData.get('currency')) ?? 'NOK',
+  })
+
+  // Collect requirements from indexed form fields (req_0_*, req_1_*, …)
+  const newReqs: Array<{
+    show_id: string
+    role_name: string
+    quantity: number
+    min_score: number | null
+    energy_level: RequirementEnergy
+    required_gender: RequirementGender
+    required_tags: string[] | null
+  }> = []
+
+  let i = 0
+  while (formData.has(`req_${i}_role_name`)) {
+    const roleName = String(formData.get(`req_${i}_role_name`) ?? '').trim()
+    if (roleName) {
+      newReqs.push({
+        show_id: show.id,
+        role_name: roleName,
+        quantity: Math.max(1, Number(formData.get(`req_${i}_quantity`) ?? 1)),
+        min_score: optionalInteger(formData.get(`req_${i}_min_score`)),
+        energy_level: ((formData.get(`req_${i}_energy_level`) as RequirementEnergy | null) ?? 'any'),
+        required_gender: ((formData.get(`req_${i}_required_gender`) as RequirementGender | null) ?? 'any'),
+        required_tags: tagsFromForm(formData.get(`req_${i}_required_tags`)),
+      })
+    }
+    i++
+  }
+
+  // If no requirements in form, copy from template
+  if (newReqs.length === 0) {
+    const { data: templateReqs } = await db
+      .from('show_requirements')
+      .select('role_name, quantity, min_score, energy_level, required_gender, required_tags')
+      .eq('show_id', templateId)
+    for (const r of templateReqs ?? []) {
+      newReqs.push({
+        show_id: show.id,
+        role_name: r.role_name,
+        quantity: r.quantity,
+        min_score: r.min_score,
+        energy_level: r.energy_level as RequirementEnergy,
+        required_gender: ((r as { required_gender?: string }).required_gender as RequirementGender | undefined) ?? 'any',
+        required_tags: r.required_tags,
+      })
+    }
+  }
+
+  if (newReqs.length > 0) {
+    await db.from('show_requirements').insert(newReqs)
+  }
+
+  scheduleShowAutomation(show.id, 'clone-book')
+  redirect(`/admin-app/shows/${show.id}?tab=lineup`)
+}
+
 export async function addRequirementAction(formData: FormData) {
   const showId = formData.get('show_id') as string
   const db = createAdminClient()
@@ -88,6 +160,7 @@ export async function addRequirementAction(formData: FormData) {
     quantity: Math.max(1, Number(formData.get('quantity') ?? 1)),
     min_score: optionalInteger(formData.get('min_score')),
     energy_level: ((formData.get('energy_level') as RequirementEnergy | null) ?? 'any'),
+    required_gender: ((formData.get('required_gender') as RequirementGender | null) ?? 'any'),
     required_tags: tagsFromForm(formData.get('required_tags')),
   })
   revalidatePath(`/admin-app/shows/${showId}`)
@@ -142,6 +215,7 @@ export async function updateRequirementAction(formData: FormData) {
     quantity: Math.max(1, Number(formData.get('quantity') ?? 1)),
     min_score: optionalInteger(formData.get('min_score')),
     energy_level: ((formData.get('energy_level') as RequirementEnergy | null) ?? 'any'),
+    required_gender: ((formData.get('required_gender') as RequirementGender | null) ?? 'any'),
     required_tags: tagsFromForm(formData.get('required_tags')),
   }).eq('id', reqId)
 

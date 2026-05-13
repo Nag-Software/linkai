@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import Image from 'next/image'
 import { Input } from '@/components/ui/input'
 import { updateArtistProfile } from '@/app/admin-app/artists/[id]/actions'
 import type { Artist } from '@/types/database'
 
-type EditableField = 'full_name' | 'stage_name' | 'email' | 'phone' | 'category' | 'language' | 'bio' | 'consent_ai_research' | 'social_links'
+type EditableField = 'full_name' | 'stage_name' | 'email' | 'phone' | 'category' | 'language' | 'bio' | 'consent_ai_research' | 'social_links' | 'gender'
 
 type SocialEntry = { key: string; url: string }
 
@@ -29,6 +30,7 @@ export function EditableArtistProfile({ artist }: { artist: Artist }) {
     bio: artist.bio ?? '',
     consent_ai_research: artist.consent_ai_research,
     social_links: socialLinksToEntries(artist.social_links),
+    gender: artist.gender ?? '',
   })
   const [editing, setEditing] = useState<EditableField | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -68,9 +70,12 @@ export function EditableArtistProfile({ artist }: { artist: Artist }) {
       <h2 className="font-semibold text-sm">Innsendt profil</h2>
       <div className="flex flex-col gap-4 sm:flex-row">
         {artist.profile_image_url && (
-          <img
+          <Image
             src={artist.profile_image_url}
             alt={artist.full_name}
+            width={224}
+            height={288}
+            sizes="(max-width: 640px) 100vw, 224px"
             className="h-64 w-full rounded-xl object-cover sm:h-56 sm:w-44 lg:h-72 lg:w-56 shrink-0"
           />
         )}
@@ -175,6 +180,34 @@ export function EditableArtistProfile({ artist }: { artist: Artist }) {
                 onKeyDown={e => handleKeyDown(e, 'language', values.language)}
                 className="h-7 text-sm"
               />
+            }
+          />
+
+          {/* Kjønn */}
+          <EditableFieldRow
+            label="Kjønn"
+            isEditing={editing === 'gender'}
+            display={
+              <span className={cellClass} onClick={() => setEditing('gender')}>
+                {values.gender === 'male' ? 'Mann' : values.gender === 'female' ? 'Dame' : values.gender === 'other' ? 'Annet' : <em className="text-muted-foreground not-italic">—</em>}
+              </span>
+            }
+            input={
+              <select
+                autoFocus
+                value={values.gender}
+                onChange={e => {
+                  setValues(v => ({ ...v, gender: e.target.value }))
+                  commitEditing('gender', e.target.value)
+                }}
+                onBlur={() => commitEditing('gender', values.gender)}
+                className="w-full border border-input rounded-md px-2 py-1 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring h-7"
+              >
+                <option value="">Ikke oppgitt</option>
+                <option value="male">Mann</option>
+                <option value="female">Dame</option>
+                <option value="other">Annet</option>
+              </select>
             }
           />
 

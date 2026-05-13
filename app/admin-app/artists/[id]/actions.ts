@@ -6,19 +6,23 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { approveArtist } from '@/lib/actions/artist'
 import { runArtistAiAssessment } from '@/lib/actions/ai'
 import { runAfterResponse } from '@/lib/background'
-import type { Artist, EnergyLevel, ArtistStatus } from '@/types/database'
+import type { Artist, ArtistType, EnergyLevel, ArtistGender, ArtistStatus } from '@/types/database'
 
 export async function saveArtistAdminReview(formData: FormData) {
   const artistId = formData.get('artist_id') as string
   const db = createAdminClient()
 
-  const tagsRaw = (formData.get('admin_tags') as string ?? '').split(',').map(s => s.trim()).filter(Boolean)
+  const tagsRaw = formData.getAll('admin_tags').map((t) => String(t).trim()).filter(Boolean)
   const energyRaw = ((formData.get('admin_energy_level') as string) || null) as EnergyLevel | null
   const statusRaw = (formData.get('status') as string) as ArtistStatus
+  const genderRaw = ((formData.get('gender') as string) || null) as ArtistGender | null
+  const adminTypeRaw = formData.getAll('admin_type').map((t) => String(t)) as ArtistType[]
 
   await db.from('artists').update({
     admin_score: formData.get('admin_score') ? Number(formData.get('admin_score')) : null,
     admin_energy_level: energyRaw,
+    admin_type: adminTypeRaw.length ? adminTypeRaw : null,
+    gender: genderRaw,
     admin_tags: tagsRaw.length ? tagsRaw : null,
     admin_notes: (formData.get('admin_notes') as string) || null,
     status: statusRaw,
@@ -96,6 +100,7 @@ export async function updateArtistProfile(formData: FormData) {
   if (formData.has('category')) update.category = (formData.get('category') as string).trim() || null
   if (formData.has('language')) update.language = (formData.get('language') as string).trim() || null
   if (formData.has('bio')) update.bio = (formData.get('bio') as string).trim() || null
+  if (formData.has('gender')) update.gender = ((formData.get('gender') as string).trim() || null) as Artist['gender']
   if (formData.has('consent_ai_research')) update.consent_ai_research = formData.get('consent_ai_research') === 'true'
   if (formData.has('social_links')) update.social_links = social_links
 

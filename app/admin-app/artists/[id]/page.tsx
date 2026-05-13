@@ -13,6 +13,7 @@ import {
   deleteArtistAction,
 } from './actions'
 import { DeleteButton } from '@/components/admin/delete-button'
+import { TagInput } from '@/components/admin/tag-input'
 
 export default async function ArtistDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -41,7 +42,7 @@ export default async function ArtistDetailPage({ params }: { params: Promise<{ i
               action={deleteArtistAction}
               id={artist.id}
               idField="artist_id"
-              confirmMessage={`Slett artisten "${artist.full_name}"? Dette kan ikke angres.`}
+              confirmMessage={`Slett komikeren "${artist.full_name}"? Dette kan ikke angres.`}
             />
           </div>
         }
@@ -138,57 +139,102 @@ export default async function ArtistDetailPage({ params }: { params: Promise<{ i
 
         {/* ── Right: Admin review form ── */}
         <div className="space-y-4">
-          <section className="rounded-xl border bg-card p-5 space-y-4">
+          <section className="rounded-xl border bg-card p-5 space-y-5">
             <h2 className="font-semibold text-sm">Admin-vurdering</h2>
 
-            <ToastActionForm action={saveArtistAdminReview} className="space-y-4" successMessage="Vurderingen er lagret.">
+            <ToastActionForm action={saveArtistAdminReview} className="space-y-5" successMessage="Vurderingen er lagret.">
               <input type="hidden" name="artist_id" value={artist.id} />
+
+              {/* Kjønn */}
+              <AdminChipGroup
+                label="Kjønn"
+                name="gender"
+                current={artist.gender ?? ''}
+                chips={[
+                  { value: 'male', label: 'Mann' },
+                  { value: 'female', label: 'Kvinne' },
+                ]}
+              />
+
+              {/* Energinivå */}
+              <AdminChipGroup
+                label="Energinivå"
+                name="admin_energy_level"
+                current={artist.admin_energy_level ?? ''}
+                chips={[
+                  { value: 'high', label: 'Høy' },
+                  { value: 'medium', label: 'Middels' },
+                  { value: 'low', label: 'Lav' },
+                ]}
+              />
+
+              {/* Score */}
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">Score</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {scoreOptions.map((n) => (
+                    <label key={n} className="cursor-pointer">
+                      <input
+                        type="radio"
+                        name="admin_score"
+                        value={n}
+                        defaultChecked={artist.admin_score === n}
+                        className="sr-only peer"
+                      />
+                      <span className="flex h-8 w-8 items-center justify-center rounded-md border text-xs font-semibold transition-colors peer-checked:bg-primary peer-checked:text-primary-foreground peer-checked:border-primary hover:bg-muted select-none">
+                        {n}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Type — multi-select */}
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">Type</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { value: 'headliner', label: 'Headliner' },
+                    { value: 'konferansier', label: 'Konferansier' },
+                    { value: 'klubbkomiker', label: 'Klubbkomiker' },
+                    { value: 'open_mic', label: 'Open Mic' },
+                  ].map((chip) => (
+                    <label key={chip.value} className="cursor-pointer">
+                      <input
+                        type="checkbox"
+                        name="admin_type"
+                        value={chip.value}
+                        defaultChecked={(artist.admin_type ?? []).includes(chip.value as never)}
+                        className="sr-only peer"
+                      />
+                      <span className="inline-flex items-center px-3 py-1 rounded-full border text-xs font-medium transition-colors select-none peer-checked:bg-primary peer-checked:text-primary-foreground peer-checked:border-primary hover:bg-muted">
+                        {chip.label}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
 
               {/* Status */}
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Status</label>
                 <select name="status" defaultValue={artist.status}
                   className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring">
-                  <option value="pending_review">pending_review</option>
-                  <option value="approved">approved</option>
-                  <option value="rejected">rejected</option>
-                  <option value="inactive">inactive</option>
-                  <option value="flagged">flagged</option>
-                </select>
-              </div>
-
-              {/* Score */}
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Admin score (1–10)</label>
-                <select name="admin_score" defaultValue={artist.admin_score ?? ''}
-                  className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring">
-                  <option value="">— ingen —</option>
-                  {scoreOptions.map((n) => (
-                    <option key={n} value={n}>{n}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Energy */}
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Energinivå</label>
-                <select name="admin_energy_level" defaultValue={artist.admin_energy_level ?? ''}
-                  className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring">
-                  <option value="">— ingen —</option>
-                  <option value="high">high</option>
-                  <option value="low">low</option>
-                  <option value="uncertain">uncertain</option>
+                  <option value="pending_review">Til vurdering</option>
+                  <option value="approved">Godkjent</option>
+                  <option value="rejected">Avvist</option>
+                  <option value="inactive">Inaktiv</option>
+                  <option value="flagged">Flagget</option>
                 </select>
               </div>
 
               {/* Tags */}
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Tags (kommaseparert)</label>
-                <input
+                <label className="text-xs font-medium text-muted-foreground">Tags</label>
+                <TagInput
                   name="admin_tags"
-                  defaultValue={(artist.admin_tags ?? []).join(', ')}
-                  className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-                  placeholder="jazz, vocals, electro"
+                  initialTags={artist.admin_tags ?? []}
+                  placeholder="Skriv og trykk Enter…"
                 />
               </div>
 
@@ -261,6 +307,35 @@ function AiBadge({ label, value }: { label: string; value: string | number }) {
     <div className="rounded-lg bg-muted px-3 py-2 text-center">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="font-bold text-sm mt-0.5">{value}</p>
+    </div>
+  )
+}
+
+function AdminChipGroup({ label, name, current, chips }: {
+  label: string
+  name: string
+  current: string  // single-select (radio)
+  chips: { value: string; label: string }[]
+}) {
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      <div className="flex flex-wrap gap-1.5">
+        {chips.map(chip => (
+          <label key={chip.value} className="cursor-pointer">
+            <input
+              type="radio"
+              name={name}
+              value={chip.value}
+              defaultChecked={current === chip.value}
+              className="sr-only peer"
+            />
+            <span className="inline-flex items-center px-3 py-1 rounded-full border text-xs font-medium transition-colors select-none peer-checked:bg-primary peer-checked:text-primary-foreground peer-checked:border-primary hover:bg-muted">
+              {chip.label}
+            </span>
+          </label>
+        ))}
+      </div>
     </div>
   )
 }

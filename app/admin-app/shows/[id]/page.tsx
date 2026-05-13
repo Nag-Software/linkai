@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { AdminHeader } from '@/components/admin/admin-header'
 import { ToastActionForm } from '@/components/toast-action-form'
@@ -347,7 +348,9 @@ export default async function ShowDetailPage({
                     </button>
                   </ToastActionForm>
                 </div>
-                <img src={show.poster_url} alt={`Plakat for ${show.title}`} className="max-h-96 rounded-lg object-contain border" />
+                <div className="relative h-96 w-full overflow-hidden rounded-lg border bg-muted/20">
+                  <Image src={show.poster_url} alt={`Plakat for ${show.title}`} fill sizes="(max-width: 768px) 92vw, 50vw" className="object-contain" />
+                </div>
               </div>
             )}
           </div>
@@ -373,36 +376,52 @@ export default async function ShowDetailPage({
                         <button type="submit" className="text-xs text-destructive hover:underline">Slett krav</button>
                       </ToastActionForm>
                     </div>
-                    <ToastActionForm action={updateRequirementAction} className="grid grid-cols-1 md:grid-cols-6 gap-3">
+                    <ToastActionForm action={updateRequirementAction} className="space-y-3">
                       <input type="hidden" name="show_id" value={show.id} />
                       <input type="hidden" name="req_id" value={r.id} />
-                      <label className="space-y-1 md:col-span-2">
-                        <span className="text-xs font-medium text-muted-foreground">Rolle</span>
-                        <input name="role_name" required defaultValue={r.role_name} className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
-                      </label>
-                      <label className="space-y-1">
-                        <span className="text-xs font-medium text-muted-foreground">Antall</span>
-                        <input name="quantity" type="number" min={1} defaultValue={r.quantity} className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
-                      </label>
-                      <label className="space-y-1">
-                        <span className="text-xs font-medium text-muted-foreground">Min score</span>
-                        <input name="min_score" type="number" min={1} max={10} defaultValue={r.min_score ?? ''} className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
-                      </label>
-                      <label className="space-y-1 md:col-span-2">
-                        <span className="text-xs font-medium text-muted-foreground">Energi</span>
-                        <select name="energy_level" defaultValue={r.energy_level} className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring">
-                          <option value="any">Alle</option>
-                          <option value="high">Høy energi</option>
-                          <option value="low">Lav energi</option>
-                          <option value="uncertain">Usikker</option>
-                        </select>
-                      </label>
-                      <label className="space-y-1 md:col-span-5">
-                        <span className="text-xs font-medium text-muted-foreground">Tags</span>
-                        <input name="required_tags" defaultValue={(r.required_tags ?? []).join(', ')} className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
-                      </label>
-                      <div className="flex items-end">
-                        <button type="submit" className="w-full px-3 py-2 rounded-md border text-sm font-medium hover:bg-muted transition-colors">Lagre</button>
+                      <div className="grid grid-cols-3 gap-3">
+                        <label className="space-y-1 col-span-1">
+                          <span className="text-xs font-medium text-muted-foreground">Rolle</span>
+                          <input name="role_name" required defaultValue={r.role_name} className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
+                        </label>
+                        <label className="space-y-1">
+                          <span className="text-xs font-medium text-muted-foreground">Antall</span>
+                          <input name="quantity" type="number" min={1} defaultValue={r.quantity} className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
+                        </label>
+                        <label className="space-y-1">
+                          <span className="text-xs font-medium text-muted-foreground">Min score</span>
+                          <input name="min_score" type="number" min={1} max={10} defaultValue={r.min_score ?? ''} className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
+                        </label>
+                      </div>
+                      <ShowChipGroup
+                        label="Energinivå"
+                        name="energy_level"
+                        current={r.energy_level}
+                        chips={[
+                          { value: 'any', label: 'Alle' },
+                          { value: 'high', label: 'Høy' },
+                          { value: 'medium', label: 'Middels' },
+                          { value: 'low', label: 'Lav' },
+                        ]}
+                      />
+                      <ShowChipGroup
+                        label="Kjønn"
+                        name="required_gender"
+                        current={r.required_gender}
+                        chips={[
+                          { value: 'any', label: 'Alle' },
+                          { value: 'male', label: 'Mann' },
+                          { value: 'female', label: 'Dame' },
+                        ]}
+                      />
+                      <div className="flex gap-3">
+                        <label className="space-y-1 flex-1">
+                          <span className="text-xs font-medium text-muted-foreground">Tags</span>
+                          <input name="required_tags" defaultValue={(r.required_tags ?? []).join(', ')} className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
+                        </label>
+                        <div className="flex items-end">
+                          <button type="submit" className="px-4 py-2 rounded-md border text-sm font-medium hover:bg-muted transition-colors whitespace-nowrap">Lagre</button>
+                        </div>
                       </div>
                     </ToastActionForm>
                   </div>
@@ -415,8 +434,8 @@ export default async function ShowDetailPage({
                 <h2 className="font-semibold text-sm">Legg til bookingbehov</h2>
                 <ToastActionForm action={addRequirementAction} className="space-y-3">
                   <input type="hidden" name="show_id" value={show.id} />
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-1 col-span-1">
                       <label className="text-xs font-medium text-muted-foreground">Rolle *</label>
                       <input name="role_name" required placeholder="headliner, support, opener…"
                         className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
@@ -431,17 +450,28 @@ export default async function ShowDetailPage({
                       <input name="min_score" type="number" min={1} max={10} placeholder="7"
                         className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium text-muted-foreground">Energinivå</label>
-                      <select name="energy_level"
-                        className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring">
-                        <option value="any">Alle</option>
-                        <option value="high">Høy energi</option>
-                        <option value="low">Lav energi</option>
-                        <option value="uncertain">Usikker</option>
-                      </select>
-                    </div>
                   </div>
+                  <ShowChipGroup
+                    label="Energinivå"
+                    name="energy_level"
+                    current="any"
+                    chips={[
+                      { value: 'any', label: 'Alle' },
+                      { value: 'high', label: 'Høy' },
+                      { value: 'medium', label: 'Middels' },
+                      { value: 'low', label: 'Lav' },
+                    ]}
+                  />
+                  <ShowChipGroup
+                    label="Kjønn"
+                    name="required_gender"
+                    current="any"
+                    chips={[
+                      { value: 'any', label: 'Alle' },
+                      { value: 'male', label: 'Mann' },
+                      { value: 'female', label: 'Dame' },
+                    ]}
+                  />
                   <div className="space-y-1">
                     <label className="text-xs font-medium text-muted-foreground">Tags (kommaseparert)</label>
                     <input name="required_tags" placeholder="jazz, folk, electro"
@@ -534,8 +564,7 @@ export default async function ShowDetailPage({
                             <tr key={o.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
                               <td className="px-2 py-2 w-10">
                                 {artist?.profile_image_url ? (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img src={artist.profile_image_url} alt="" width={24} height={24} className="size-6 rounded-full object-cover" />
+                                  <Image src={artist.profile_image_url} alt="" width={24} height={24} className="size-6 rounded-full object-cover" />
                                 ) : (
                                   <div className="size-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground">
                                     {(artist?.full_name ?? '?').charAt(0)}
@@ -678,7 +707,7 @@ export default async function ShowDetailPage({
                     <div key={spot.id} className="rounded-xl border bg-card overflow-hidden">
                       <div className="flex items-center gap-3 p-4">
                         {artist?.profile_image_url ? (
-                          <img src={artist.profile_image_url} alt="" className="size-14 rounded-full object-cover shrink-0" />
+                          <Image src={artist.profile_image_url} alt="" width={56} height={56} className="size-14 rounded-full object-cover shrink-0" />
                         ) : (
                           <div className="size-14 rounded-full bg-muted flex items-center justify-center text-xl font-bold text-muted-foreground shrink-0">
                             {(artist?.full_name ?? '?').charAt(0)}
@@ -741,7 +770,9 @@ export default async function ShowDetailPage({
                 </div>
                 {show.poster_url ? (
                   <div className="space-y-2">
-                    <img src={show.poster_url} alt={`Plakat for ${show.title}`} className="w-full rounded-lg object-contain border max-h-80" />
+                    <div className="relative h-80 w-full overflow-hidden rounded-lg border bg-muted/20">
+                      <Image src={show.poster_url} alt={`Plakat for ${show.title}`} fill sizes="(max-width: 1024px) 92vw, 45vw" className="object-contain" />
+                    </div>
                     <a href={show.poster_url} target="_blank" rel="noreferrer" className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline block">
                       Åpne i ny fane
                     </a>
@@ -827,6 +858,40 @@ export default async function ShowDetailPage({
             )}
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+function ShowChipGroup({
+  label,
+  name,
+  current,
+  chips,
+}: {
+  label: string
+  name: string
+  current: string
+  chips: { value: string; label: string }[]
+}) {
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      <div className="flex flex-wrap gap-1.5">
+        {chips.map((chip) => (
+          <label key={chip.value} className="cursor-pointer">
+            <input
+              type="radio"
+              name={name}
+              value={chip.value}
+              defaultChecked={current === chip.value}
+              className="sr-only peer"
+            />
+            <span className="inline-flex items-center px-3 py-1 rounded-full border text-xs font-medium transition-colors select-none peer-checked:bg-primary peer-checked:text-primary-foreground peer-checked:border-primary hover:bg-muted">
+              {chip.label}
+            </span>
+          </label>
+        ))}
       </div>
     </div>
   )

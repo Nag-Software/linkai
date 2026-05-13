@@ -272,7 +272,7 @@ export default async function AdminDashboardPage() {
             {/* Summary stats */}
             <div className="rounded-xl border bg-card divide-y overflow-hidden">
               {[
-                { icon: UserCheck, label: 'Godkjente artister', value: data.approvedArtists },
+                { icon: UserCheck, label: 'Godkjente komikere', value: data.approvedArtists },
                 { icon: Ticket, label: 'Solgte billetter', value: data.soldTickets },
                 { icon: CreditCard, label: 'Total inntekt', value: formatNOK(data.totalRevenue) },
               ].map(({ icon: Icon, label, value }) => (
