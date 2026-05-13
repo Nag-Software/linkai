@@ -18,6 +18,7 @@ const statusColors: Record<ArtistStatus, string> = {
 
 const energyColors: Record<EnergyLevel, string> = {
   high: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-400',
+  medium: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400',
   low: 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-400',
   uncertain: 'bg-zinc-100 text-zinc-500',
 }

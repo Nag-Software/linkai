@@ -387,6 +387,7 @@ export type Database = {
           quantity: number
           min_score?: number | null
           energy_level?: RequirementEnergy
+          required_gender?: RequirementGender
           required_tags?: string[] | null
           created_at?: string
           updated_at?: string

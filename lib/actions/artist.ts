@@ -111,7 +111,7 @@ export async function approveArtist(
   artistId: string,
   opts: {
     admin_score: number
-    admin_energy_level: 'high' | 'low' | 'uncertain'
+    admin_energy_level: 'high' | 'medium' | 'low' | 'uncertain'
     admin_tags?: string[]
     admin_notes?: string
   }
