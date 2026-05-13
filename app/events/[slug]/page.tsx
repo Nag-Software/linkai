@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { ToastActionForm } from '@/components/toast-action-form'
 import { startCheckoutAction } from '../actions'
 import { formatShowDate, formatShowTime, formatTicketPrice, getPublicLineup, getPublishedShowBySlug, remainingTickets, ticketFillPercent } from '@/lib/public-events'
+import { shouldBypassImageOptimization } from '@/lib/utils'
 import { PublicHeader } from '@/components/public/public-header'
 
 type Props = {
@@ -117,7 +118,7 @@ export default async function EventDetailPage({ params, searchParams }: Props) {
               {lineup.map((item) => (
                 <Link key={item.spot.id} href={item.artist ? `/artists/${item.artist.id}` : '#'} className="group grid grid-cols-[80px_1fr] border-2 border-zinc-950 bg-[#fbf7ec] shadow-[5px_5px_0_rgba(24,24,27,0.12)] transition hover:-translate-y-0.5">
                   <div className="relative size-20 border-r-2 border-zinc-950 bg-zinc-200">
-                    {item.artist?.profile_image_url ? <Image src={item.artist.profile_image_url} alt={item.artist.stage_name ?? item.artist.full_name} fill sizes="80px" className="object-contain p-1 grayscale-[10%] transition group-hover:grayscale-0" /> : null}
+                    {item.artist?.profile_image_url ? <Image src={item.artist.profile_image_url} alt={item.artist.stage_name ?? item.artist.full_name} fill sizes="80px" unoptimized={shouldBypassImageOptimization(item.artist.profile_image_url)} className="object-contain p-1 grayscale-[10%] transition group-hover:grayscale-0" /> : null}
                   </div>
                   <div className="min-w-0 p-3">
                     <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">{item.role?.role_name ?? 'Artist'}</div>

@@ -5,6 +5,7 @@ import type { Metadata } from 'next'
 import { ArrowLeft, ArrowUpRight, CalendarDays, Languages, MapPin, Mic2, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { artistDisplayName, artistInitials, getPublicArtistById, getPublicArtistShows } from '@/lib/public-artists'
+import { shouldBypassImageOptimization } from '@/lib/utils'
 import { PublicHeader } from '@/components/public/public-header'
 import { formatShortDate, formatShowTime } from '@/lib/public-events'
 
@@ -53,7 +54,7 @@ export default async function ArtistDetailPage({ params }: Props) {
         <div className="relative mx-auto grid max-w-6xl gap-8 px-4 pb-10 pt-8 md:grid-cols-[340px_1fr] md:items-end md:px-6 md:pb-14 lg:px-8">
           <div className="relative aspect-[4/5] overflow-hidden border-2 border-zinc-950 bg-zinc-200 p-2 shadow-[10px_10px_0_rgba(24,24,27,0.18)]">
             {artist.profile_image_url ? (
-              <Image src={artist.profile_image_url} alt={name} fill priority sizes="(max-width: 768px) 92vw, 340px" className="object-contain p-2 grayscale-[10%]" />
+              <Image src={artist.profile_image_url} alt={name} fill priority sizes="(max-width: 768px) 92vw, 340px" unoptimized={shouldBypassImageOptimization(artist.profile_image_url)} className="object-contain p-2 grayscale-[10%]" />
             ) : (
               <div className="flex h-full items-center justify-center bg-[#b83224] text-6xl font-black text-white">
                 {artistInitials(artist)}

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { ToastActionForm } from '@/components/toast-action-form'
 import { updateArtistProfileAction } from '../actions'
 import { getCurrentArtist } from '@/lib/artist-portal'
+import { shouldBypassImageOptimization } from '@/lib/utils'
 
 export default async function ArtistProfilePage() {
   const { artist } = await getCurrentArtist()
@@ -53,7 +54,7 @@ export default async function ArtistProfilePage() {
           {artist.profile_image_url && (
             <Card>
               <div className="relative aspect-square w-full overflow-hidden">
-                <Image src={artist.profile_image_url} alt={artist.stage_name ?? artist.full_name} fill className="object-cover" />
+                <Image src={artist.profile_image_url} alt={artist.stage_name ?? artist.full_name} fill unoptimized={shouldBypassImageOptimization(artist.profile_image_url)} className="object-cover" />
               </div>
             </Card>
           )}

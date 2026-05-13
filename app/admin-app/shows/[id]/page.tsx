@@ -6,6 +6,8 @@ import { AdminHeader } from '@/components/admin/admin-header'
 import { ToastActionForm } from '@/components/toast-action-form'
 import { ManualSpotForm } from './manual-spot-form'
 import { DeleteButton } from '@/components/admin/delete-button'
+import { CloneButton } from './clone-button'
+import { shouldBypassImageOptimization } from '@/lib/utils'
 import {
   addRequirementAction,
   deleteRequirementAction,
@@ -18,7 +20,7 @@ import {
   updateRequirementAction,
 } from '../actions'
 
-type ShowTab = 'overview' | 'requirements' | 'booking' | 'lineup' | 'marketing' | 'tickets'
+type ShowTab = 'setup' | 'lineup' | 'publish'
 type LineupMode = 'auto' | 'manual'
 
 export default async function ShowDetailPage({
@@ -29,11 +31,27 @@ export default async function ShowDetailPage({
   searchParams: Promise<{ tab?: ShowTab; mode?: LineupMode }>
 }) {
   const { id } = await params
-  const { tab = 'overview', mode = 'auto' } = await searchParams
+  const searchParamsAwaited = await searchParams
+  const rawTab = searchParamsAwaited.tab as string | undefined
+  const mode = searchParamsAwaited.mode as string | undefined
+  const tab = rawTab ?? 'setup'
   const lineupMode: LineupMode = mode === 'manual' ? 'manual' : 'auto'
+  
+  // Map old tab names to new consolidated tabs for backwards compatibility
+  const tabMapping: Record<string, ShowTab> = {
+    'overview': 'setup',
+    'requirements': 'setup',
+    'booking': 'lineup',
+    'lineup': 'lineup',
+    'marketing': 'publish',
+    'tickets': 'publish',
+    'setup': 'setup',
+    'publish': 'publish',
+  }
+  const mappedTab: ShowTab = (tabMapping[tab] as ShowTab) || 'setup'
   const db = createAdminClient()
-  const shouldLoadTickets = tab === 'tickets'
-  const shouldLoadMarketingTasks = tab === 'marketing'
+  const shouldLoadTickets = tab === 'tickets' || tab === 'publish'
+  const shouldLoadMarketingTasks = tab === 'marketing' || tab === 'publish'
   const shouldLoadRelatedArtists = tab === 'booking' || tab === 'lineup' || tab === 'marketing'
   const shouldLoadLineupRequirements = tab === 'lineup'
   const shouldLoadSelectableArtists = tab === 'lineup'
@@ -108,12 +126,9 @@ export default async function ShowDetailPage({
   }
 
   const TABS: { key: ShowTab; label: string; badge?: number }[] = [
-    { key: 'overview', label: 'Oversikt' },
-    { key: 'requirements', label: 'Krav' },
-    { key: 'booking', label: 'Tilbud', badge: offerStats.sent || undefined },
-    { key: 'lineup', label: 'Lineup', badge: activeLineup.length || undefined },
-    { key: 'marketing', label: 'Markedsføring' },
-    { key: 'tickets', label: 'Billetter' },
+    { key: 'setup', label: 'Oppsett' },
+    { key: 'lineup', label: 'Lineup', badge: Math.max(offerStats.sent || 0, activeLineup.length || 0) || undefined },
+    { key: 'publish', label: 'Publiser' },
   ]
 
   const STATUS_COLORS: Record<string, string> = {
@@ -157,6 +172,7 @@ export default async function ShowDetailPage({
             <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${SHOW_STATUS_COLORS[show.status]}`}>
               {SHOW_STATUS_LABELS[show.status] ?? show.status}
             </span>
+            <CloneButton show={show} />
             <Link href="/admin-app/shows" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
               ← Tilbake
             </Link>
@@ -177,7 +193,7 @@ export default async function ShowDetailPage({
             key={t.key}
             href={`/admin-app/shows/${id}?tab=${t.key}`}
             className={`relative px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              tab === t.key
+              mappedTab === t.key
                 ? 'border-primary text-foreground'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
@@ -194,8 +210,8 @@ export default async function ShowDetailPage({
 
       <div className="p-6">
 
-        {/* ══════════════════ OVERVIEW ══════════════════ */}
-        {tab === 'overview' && (
+        {/* ══════════════════ SETUP (Overview + Requirements) ══════════════════ */}
+        {mappedTab === 'setup' && (
           <div className="space-y-6">
             {totalSlots > 0 && (
               <div className="rounded-xl border bg-card p-5 space-y-4">
@@ -356,9 +372,9 @@ export default async function ShowDetailPage({
           </div>
         )}
 
-        {/* ══════════════════ REQUIREMENTS ══════════════════ */}
-        {tab === 'requirements' && (
-          <div className="space-y-6 max-w-3xl">
+        {/* ══════════════════ SETUP - REQUIREMENTS SECTION ══════════════════ */}
+        {mappedTab === 'setup' && (
+          <div className="mt-8 space-y-6 max-w-3xl border-t pt-6">
             {reqFillStatus.length > 0 && (
               <div className="space-y-3">
                 {reqFillStatus.map((r) => (
@@ -508,8 +524,8 @@ export default async function ShowDetailPage({
           </div>
         )}
 
-        {/* ══════════════════ BOOKING OFFERS ══════════════════ */}
-        {tab === 'booking' && (
+        {/* ══════════════════ LINEUP (Booking Offers + Lineup) ══════════════════ */}
+        {mappedTab === 'lineup' && (
           <div className="space-y-6">
             {['booking', 'draft'].includes(show.status) && (requirements ?? []).length > 0 && (
               <div className="flex items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3">
@@ -564,7 +580,7 @@ export default async function ShowDetailPage({
                             <tr key={o.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
                               <td className="px-2 py-2 w-10">
                                 {artist?.profile_image_url ? (
-                                  <Image src={artist.profile_image_url} alt="" width={24} height={24} className="size-6 rounded-full object-cover" />
+                                  <Image src={artist.profile_image_url} alt="" width={24} height={24} unoptimized={shouldBypassImageOptimization(artist.profile_image_url)} className="size-6 rounded-full object-cover" />
                                 ) : (
                                   <div className="size-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground">
                                     {(artist?.full_name ?? '?').charAt(0)}
@@ -613,9 +629,9 @@ export default async function ShowDetailPage({
           </div>
         )}
 
-        {/* ══════════════════ LINEUP ══════════════════ */}
-        {tab === 'lineup' && (
-          <div className="space-y-6">
+        {/* ══════════════════ LINEUP - CONFIRMED SPOTS SECTION ══════════════════ */}
+        {mappedTab === 'lineup' && (
+          <div className="mt-8 space-y-6 border-t pt-6">
             <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <h2 className="text-sm font-semibold">Lineup-modus</h2>
@@ -707,7 +723,7 @@ export default async function ShowDetailPage({
                     <div key={spot.id} className="rounded-xl border bg-card overflow-hidden">
                       <div className="flex items-center gap-3 p-4">
                         {artist?.profile_image_url ? (
-                          <Image src={artist.profile_image_url} alt="" width={56} height={56} className="size-14 rounded-full object-cover shrink-0" />
+                          <Image src={artist.profile_image_url} alt="" width={56} height={56} unoptimized={shouldBypassImageOptimization(artist.profile_image_url)} className="size-14 rounded-full object-cover shrink-0" />
                         ) : (
                           <div className="size-14 rounded-full bg-muted flex items-center justify-center text-xl font-bold text-muted-foreground shrink-0">
                             {(artist?.full_name ?? '?').charAt(0)}
@@ -754,8 +770,8 @@ export default async function ShowDetailPage({
           </div>
         )}
 
-        {/* ══════════════════ MARKETING ══════════════════ */}
-        {tab === 'marketing' && (
+        {/* ══════════════════ PUBLISH (Marketing + Tickets) ══════════════════ */}
+        {mappedTab === 'publish' && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="rounded-xl border bg-card p-5 space-y-3">
@@ -832,9 +848,10 @@ export default async function ShowDetailPage({
           </div>
         )}
 
-        {/* ══════════════════ TICKETS ══════════════════ */}
-        {tab === 'tickets' && (
-          <div className="rounded-lg border overflow-x-auto">
+        {/* ══════════════════ PUBLISH - TICKETS SECTION ══════════════════ */}
+        {mappedTab === 'publish' && (
+          <div className="mt-8 space-y-6 border-t pt-6">
+            <div className="rounded-lg border overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-muted/30 border-b text-xs text-muted-foreground">
@@ -856,6 +873,7 @@ export default async function ShowDetailPage({
             {!tickets?.length && (
               <p className="text-center py-12 text-muted-foreground text-sm">Ingen billetter solgt ennå.</p>
             )}
+            </div>
           </div>
         )}
       </div>

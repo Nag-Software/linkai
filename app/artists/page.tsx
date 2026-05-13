@@ -2,6 +2,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowLeft, ArrowRight, ArrowUpRight } from 'lucide-react'
 import { artistDisplayName, artistInitials, getPublicArtists } from '@/lib/public-artists'
+import { shouldBypassImageOptimization } from '@/lib/utils'
 import { PublicHeader } from '@/components/public/public-header'
 
 export const metadata = {
@@ -63,7 +64,7 @@ export default async function ArtistsPage() {
             <Link key={artist.id} href={`/artists/${artist.id}`} className="group border-2 border-zinc-950 bg-[#fbf7ec] shadow-[6px_6px_0_rgba(24,24,27,0.14)] transition hover:-translate-y-0.5 hover:shadow-[4px_4px_0_rgba(24,24,27,0.22)]">
               <div className="relative aspect-[4/3] border-b-2 border-zinc-950 bg-zinc-200">
                 {artist.profile_image_url ? (
-                  <Image src={artist.profile_image_url} alt={artistDisplayName(artist)} fill sizes="(max-width: 640px) 92vw, (max-width: 1024px) 45vw, 31vw" className="object-contain p-2 grayscale-[10%] transition group-hover:grayscale-0" />
+                  <Image src={artist.profile_image_url} alt={artistDisplayName(artist)} fill sizes="(max-width: 640px) 92vw, (max-width: 1024px) 45vw, 31vw" unoptimized={shouldBypassImageOptimization(artist.profile_image_url)} className="object-contain p-2 grayscale-[10%] transition group-hover:grayscale-0" />
                 ) : (
                   <div className="flex h-full items-center justify-center bg-[#b83224] text-5xl font-black text-white">
                     {artistInitials(artist)}

@@ -278,22 +278,30 @@ export default async function ArtistDetailPage({ params }: { params: Promise<{ i
             </ToastActionForm>
 
             {/* Quick actions */}
-            <div className="flex gap-2 pt-1 border-t">
-              <ToastActionForm action={approveArtistAction} className="flex-1">
-                <input type="hidden" name="artist_id" value={artist.id} />
-                <input type="hidden" name="admin_score" value={artist.admin_score ?? 7} />
-                <button type="submit"
-                  className="w-full text-xs px-3 py-1.5 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 transition-colors">
-                  ✓ Godkjenn
-                </button>
-              </ToastActionForm>
-              <ToastActionForm action={rejectArtistAction} className="flex-1">
-                <input type="hidden" name="artist_id" value={artist.id} />
-                <button type="submit"
-                  className="w-full text-xs px-3 py-1.5 rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors">
-                  ✕ Avvis
-                </button>
-              </ToastActionForm>
+            <div className="pt-1 border-t">
+              {artist.status === 'pending_review' ? (
+                <div className="flex gap-2">
+                  <ToastActionForm action={approveArtistAction} className="flex-1">
+                    <input type="hidden" name="artist_id" value={artist.id} />
+                    <input type="hidden" name="admin_score" value={artist.admin_score ?? 7} />
+                    <button type="submit"
+                      className="w-full text-xs px-3 py-1.5 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 transition-colors">
+                      ✓ Godkjenn
+                    </button>
+                  </ToastActionForm>
+                  <ToastActionForm action={rejectArtistAction} className="flex-1">
+                    <input type="hidden" name="artist_id" value={artist.id} />
+                    <button type="submit"
+                      className="w-full text-xs px-3 py-1.5 rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors">
+                      ✕ Avvis
+                    </button>
+                  </ToastActionForm>
+                </div>
+              ) : artist.status === 'approved' ? (
+                <p className="text-xs text-emerald-600 font-medium">✓ Godkjent – endelig avgjørelse</p>
+              ) : artist.status === 'rejected' ? (
+                <p className="text-xs text-destructive font-medium">✕ Avvist – endelig avgjørelse</p>
+              ) : null}
             </div>
           </section>
         </div>

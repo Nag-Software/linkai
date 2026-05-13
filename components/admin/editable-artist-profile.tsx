@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import { Input } from '@/components/ui/input'
 import { updateArtistProfile } from '@/app/admin-app/artists/[id]/actions'
+import { shouldBypassImageOptimization } from '@/lib/utils'
 import type { Artist } from '@/types/database'
 
 type EditableField = 'full_name' | 'stage_name' | 'email' | 'phone' | 'category' | 'language' | 'bio' | 'consent_ai_research' | 'social_links' | 'gender'
@@ -34,6 +35,10 @@ export function EditableArtistProfile({ artist }: { artist: Artist }) {
   })
   const [editing, setEditing] = useState<EditableField | null>(null)
   const [isPending, startTransition] = useTransition()
+  
+  // Autosave setup
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastSavedRef = useRef(values)
 
   function save(field: EditableField, value: unknown) {
     const fd = new FormData()
@@ -48,17 +53,51 @@ export function EditableArtistProfile({ artist }: { artist: Artist }) {
     startTransition(() => updateArtistProfile(fd))
   }
 
-  function commitEditing(field: EditableField, value: unknown) {
-    setEditing(null)
-    save(field, value)
-  }
+  // Autosave effect
+  useEffect(() => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
+    
+    // Check which fields have changed and save them
+    saveTimeoutRef.current = setTimeout(() => {
+      const fieldsToSave: EditableField[] = []
+      
+      ;(Object.keys(values) as EditableField[]).forEach(field => {
+        const oldValue = lastSavedRef.current[field]
+        const newValue = values[field]
+        
+        // Deep comparison for social_links
+        if (field === 'social_links') {
+          if (JSON.stringify(oldValue) !== JSON.stringify(newValue)) {
+            fieldsToSave.push(field)
+          }
+        } else if (oldValue !== newValue) {
+          fieldsToSave.push(field)
+        }
+      })
+      
+      // Save each changed field
+      fieldsToSave.forEach(field => {
+        save(field, values[field])
+      })
+      
+      if (fieldsToSave.length > 0) {
+        lastSavedRef.current = JSON.parse(JSON.stringify(values))
+      }
+    }, 1500) // 1.5 second debounce
+    
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
+    }
+  }, [values])
 
-  function handleKeyDown(e: React.KeyboardEvent, field: EditableField, value: unknown) {
+  function handleKeyDown(e: React.KeyboardEvent, field: EditableField) {
     if (e.key === 'Enter' && field !== 'bio') {
       e.preventDefault()
-      commitEditing(field, value)
+      setEditing(null)
     }
     if (e.key === 'Escape') {
+      // Restore original value
+      setValues(lastSavedRef.current)
       setEditing(null)
     }
   }
@@ -76,6 +115,7 @@ export function EditableArtistProfile({ artist }: { artist: Artist }) {
             width={224}
             height={288}
             sizes="(max-width: 640px) 100vw, 224px"
+            unoptimized={shouldBypassImageOptimization(artist.profile_image_url)}
             className="h-64 w-full rounded-xl object-cover sm:h-56 sm:w-44 lg:h-72 lg:w-56 shrink-0"
           />
         )}
@@ -90,8 +130,8 @@ export function EditableArtistProfile({ artist }: { artist: Artist }) {
                 autoFocus
                 value={values.full_name}
                 onChange={e => setValues(v => ({ ...v, full_name: e.target.value }))}
-                onBlur={() => commitEditing('full_name', values.full_name)}
-                onKeyDown={e => handleKeyDown(e, 'full_name', values.full_name)}
+                onBlur={() => setEditing(null)}
+                onKeyDown={e => handleKeyDown(e, 'full_name')}
                 className="h-7 text-sm"
               />
             }
@@ -107,8 +147,8 @@ export function EditableArtistProfile({ artist }: { artist: Artist }) {
                 autoFocus
                 value={values.stage_name}
                 onChange={e => setValues(v => ({ ...v, stage_name: e.target.value }))}
-                onBlur={() => commitEditing('stage_name', values.stage_name)}
-                onKeyDown={e => handleKeyDown(e, 'stage_name', values.stage_name)}
+                onBlur={() => setEditing(null)}
+                onKeyDown={e => handleKeyDown(e, 'stage_name')}
                 className="h-7 text-sm"
               />
             }
@@ -125,8 +165,8 @@ export function EditableArtistProfile({ artist }: { artist: Artist }) {
                 type="email"
                 value={values.email}
                 onChange={e => setValues(v => ({ ...v, email: e.target.value }))}
-                onBlur={() => commitEditing('email', values.email)}
-                onKeyDown={e => handleKeyDown(e, 'email', values.email)}
+                onBlur={() => setEditing(null)}
+                onKeyDown={e => handleKeyDown(e, 'email')}
                 className="h-7 text-sm"
               />
             }
@@ -142,8 +182,8 @@ export function EditableArtistProfile({ artist }: { artist: Artist }) {
                 autoFocus
                 value={values.phone}
                 onChange={e => setValues(v => ({ ...v, phone: e.target.value }))}
-                onBlur={() => commitEditing('phone', values.phone)}
-                onKeyDown={e => handleKeyDown(e, 'phone', values.phone)}
+                onBlur={() => setEditing(null)}
+                onKeyDown={e => handleKeyDown(e, 'phone')}
                 className="h-7 text-sm"
               />
             }
@@ -159,8 +199,8 @@ export function EditableArtistProfile({ artist }: { artist: Artist }) {
                 autoFocus
                 value={values.category}
                 onChange={e => setValues(v => ({ ...v, category: e.target.value }))}
-                onBlur={() => commitEditing('category', values.category)}
-                onKeyDown={e => handleKeyDown(e, 'category', values.category)}
+                onBlur={() => setEditing(null)}
+                onKeyDown={e => handleKeyDown(e, 'category')}
                 className="h-7 text-sm"
               />
             }
@@ -176,8 +216,8 @@ export function EditableArtistProfile({ artist }: { artist: Artist }) {
                 autoFocus
                 value={values.language}
                 onChange={e => setValues(v => ({ ...v, language: e.target.value }))}
-                onBlur={() => commitEditing('language', values.language)}
-                onKeyDown={e => handleKeyDown(e, 'language', values.language)}
+                onBlur={() => setEditing(null)}
+                onKeyDown={e => handleKeyDown(e, 'language')}
                 className="h-7 text-sm"
               />
             }
@@ -198,9 +238,9 @@ export function EditableArtistProfile({ artist }: { artist: Artist }) {
                 value={values.gender}
                 onChange={e => {
                   setValues(v => ({ ...v, gender: e.target.value }))
-                  commitEditing('gender', e.target.value)
+                  setEditing(null)
                 }}
-                onBlur={() => commitEditing('gender', values.gender)}
+                onBlur={() => setEditing(null)}
                 className="w-full border border-input rounded-md px-2 py-1 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring h-7"
               >
                 <option value="">Ikke oppgitt</option>
@@ -227,9 +267,9 @@ export function EditableArtistProfile({ artist }: { artist: Artist }) {
                 onChange={e => {
                   const val = e.target.value === 'true'
                   setValues(v => ({ ...v, consent_ai_research: val }))
-                  commitEditing('consent_ai_research', val)
+                  setEditing(null)
                 }}
-                onBlur={() => commitEditing('consent_ai_research', values.consent_ai_research)}
+                onBlur={() => setEditing(null)}
                 className="w-full border border-input rounded-md px-2 py-1 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring h-7"
               >
                 <option value="false">Nei</option>
@@ -248,8 +288,8 @@ export function EditableArtistProfile({ artist }: { artist: Artist }) {
             autoFocus
             value={values.bio}
             onChange={e => setValues(v => ({ ...v, bio: e.target.value }))}
-            onBlur={() => commitEditing('bio', values.bio)}
-            onKeyDown={e => handleKeyDown(e, 'bio', values.bio)}
+            onBlur={() => setEditing(null)}
+            onKeyDown={e => handleKeyDown(e, 'bio')}
             rows={4}
             className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring"
           />
@@ -316,16 +356,10 @@ export function EditableArtistProfile({ artist }: { artist: Artist }) {
                 + Legg til lenke
               </button>
               <button
-                onClick={() => commitEditing('social_links', values.social_links)}
-                className="text-xs bg-primary text-primary-foreground rounded px-3 py-1 hover:bg-primary/90"
-              >
-                Lagre
-              </button>
-              <button
                 onClick={() => setEditing(null)}
                 className="text-xs border rounded px-2 py-1 hover:bg-muted"
               >
-                Avbryt
+                Ferdig
               </button>
             </div>
           </div>
