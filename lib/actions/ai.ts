@@ -95,12 +95,21 @@ export async function generateShowPoster(showId: string, opts: {
     const headlinerNames = headliners.map(a => a.name).join(' og ')
     const supportNames   = supporting.map(a => a.name).join(', ')
     const allNames       = sorted.map(a => a.name).join(', ')
+    const referenceArtistCount = referencePackage.identityLines.length
+    const portraitCountRule = referenceArtistCount > 0
+      ? `The final poster must contain exactly ${referenceArtistCount} supplied comedian portrait${referenceArtistCount === 1 ? '' : 's'}: one portrait per supplied profile photo, no repeated faces, no duplicate cutouts, no mirrored copies, no extra headshots, and no generated additional comedians.`
+      : `No supplied artist photos are available. Do not create prominent fake comedian faces; use typography, venue atmosphere, graphic motifs, and event details to carry the design.`
     const referenceList = referencePackage.identityLines.length > 0
       ? referencePackage.identityLines.join('\n')
       : sorted.map((artist) => `${artist.name}${artist.roleName ? ` (${artist.roleName})` : ''} - no reference photo`).join('\n')
 
     const prompt = [
-      `Create a professional Norwegian standup comedy show poster in portrait format (2:3 ratio).`,
+      `Create a ticket-selling Norwegian standup comedy show poster in portrait format (2:3 ratio).`,
+      ``,
+      `PRIMARY GOAL:`,
+      `- Make a real audience want to buy tickets: high-impact, premium, funny, confident, and instantly readable in a social feed or ticketing page thumbnail.`,
+      `- The poster must still feel like a credible Norwegian comedy venue poster, not generic AI art, stock advertising, or a movie poster parody.`,
+      `- Priority order: 1) exact artist identity, 2) readable title/date/venue, 3) attention-grabbing composition, 4) tasteful texture and details.`,
       ``,
       `SHOW DETAILS:`,
       `- Title: "${opts.title}"`,
@@ -111,9 +120,10 @@ export async function generateShowPoster(showId: string, opts: {
       ``,
       `REFERENCE PHOTOS AND FACE RULES:`,
       referenceList,
+      portraitCountRule,
       referenceImages.length > 0
-        ? `Input image 1 is a labeled IDENTITY MAP. The name printed directly under each face is the canonical mapping. Match every face to that exact printed name. Input images 2 and onward are the original Supabase profile photos in the exact same numbered order as the identity list above. Use those artist profile photos as the source of truth for the comedians. Preserve identity, face geometry, skin tone, expression, hair, glasses, beard, and distinctive features with high fidelity. Do not invent replacement faces, do not beautify, do not age-change, do not caricature, and do not merge faces. Use the supplied photos as authentic press/profile imagery in the poster composition.`
-        : `No artist reference photos were supplied. Avoid prominent generated faces; lean on typography and stage atmosphere.`,
+        ? `Input image 1 is a labeled IDENTITY MAP. The name printed directly under each face is the canonical mapping. Match every face to that exact printed name. Input images 2 and onward are the original Supabase profile photos in the exact same numbered order as the identity list above. Use those artist profile photos as the source of truth for the comedians. Preserve identity, face geometry, skin tone, expression, hair, glasses, beard, and distinctive features with high fidelity. Do not invent replacement faces, do not beautify, do not age-change, do not caricature, do not merge faces, and do not change body type or age. Use the supplied photos as authentic press/profile imagery in the poster composition.`
+        : `For the named artists, rely on names and typography instead of fabricated portraits.`,
       ``,
       `POSTER PLAN FOR THIS SPECIFIC SHOW:`,
       `- Concept: ${posterPlan.concept}`,
@@ -126,12 +136,16 @@ export async function generateShowPoster(showId: string, opts: {
       `DESIGN REQUIREMENTS:`,
       `- Make this poster visually distinct from other humor.events posters; follow the show-specific plan above.`,
       `- Norwegian comedy poster quality: credible enough for Latter, Stand Up Norge, venue posters, and ticketing pages.`,
-      `- Title "${opts.title}" must be the dominant readable text.`,
-      `- Include date and venue clearly, with a small footer: "BILLETTER · HUMOR.EVENTS".`,
-      `- Keep faces crisp, undistorted, and recognizable. Authenticity is more important than stylization.`,
+      `- Title "${opts.title}" must be the dominant readable text, with a strong silhouette and high contrast.`,
+      `- Include date, time, and venue clearly. They must remain legible at phone-screen size.`,
+      `- Include a small footer exactly as: "BILLETTER · HUMOR.EVENTS".`,
+      `- Keep faces crisp, undistorted, and recognizable. Authenticity is more important than stylization, humor, or visual novelty.`,
       `- The visible artist name next to or above each portrait must match the face according to the labeled IDENTITY MAP. Never swap names between faces.`,
       `- Do not copy the IDENTITY MAP layout, numbers, grid, or reference labels into the final poster; use it only to map each name to the correct face.`,
+      `- Use clean negative space, strong hierarchy, and punchy color contrast. Avoid clutter, tiny unreadable text, fake QR codes, fake sponsors, fake prices, and extra decorative labels.`,
+      `- Do not add unrelated people, audience faces, celebrity lookalikes, random host portraits, or background faces that could be mistaken for lineup members.`,
       `- No fake names, no extra comedians, no malformed faces, no duplicated people.`,
+      sorted.length === 1 ? `- There is exactly 1 comedian in this lineup. Include exactly ONE portrait of this person. Do not add badges, secondary thumbnails, or any duplicate representation of the same comedian.` : null,
     ].filter(Boolean).join('\n')
 
     const openai = getOpenAI()
@@ -329,7 +343,7 @@ function createPosterPlan(showId: string, title: string, date: string, artistCou
   const plans = [
     {
       concept: 'premium black-box theatre premiere, cinematic and elegant',
-      composition: artistCount > 3 ? 'clean ensemble row with the headliner slightly larger, title anchored at the bottom' : 'large central portrait with supporting artists in smaller side columns',
+      composition: artistCount > 3 ? 'clean ensemble row with the headliner slightly larger, title anchored at the bottom' : artistCount > 1 ? 'large central portrait with supporting artists in smaller side columns' : 'large central portrait filling the frame, no secondary portraits',
       photoTreatment: 'authentic photo cutouts with subtle rim light, natural skin, no illustration filter',
       palette: 'black, warm ivory, restrained gold accents',
       typography: 'tall condensed sans-serif names at top, expressive serif title at bottom',
@@ -337,7 +351,7 @@ function createPosterPlan(showId: string, title: string, date: string, artistCou
     },
     {
       concept: 'bright Norwegian comedy gala poster with magazine-cover energy',
-      composition: artistCount > 4 ? 'stacked group collage with overlapping portrait cutouts' : 'three-quarter portrait collage with dynamic diagonals',
+      composition: artistCount > 4 ? 'stacked group collage with one overlapping portrait cutout per artist' : artistCount > 1 ? 'three-quarter portrait collage with dynamic diagonals, one portrait per artist' : 'single three-quarter hero portrait with dynamic diagonals, no cameos or duplicates',
       photoTreatment: 'clean press-photo cutouts, exact faces, light studio shadow behind each comedian',
       palette: 'off-white, black, burgundy, metallic champagne',
       typography: 'bold editorial sans-serif headline with compact credit blocks',
@@ -345,7 +359,7 @@ function createPosterPlan(showId: string, title: string, date: string, artistCou
     },
     {
       concept: 'retro 1970s comedy special with colorful graphic shapes',
-      composition: 'large circular or arched portrait windows around the title, balanced like a festival poster',
+      composition: artistCount > 1 ? 'large circular or arched portrait windows around the title, exactly one window per artist' : 'one large circular or arched hero portrait window around the title, no secondary portraits',
       photoTreatment: 'profile photos placed as crisp photo inserts, not redrawn; warm studio color grade only',
       palette: 'coral, teal, ochre, cream, deep brown text',
       typography: 'chunky rounded display title with small clean venue/date text',
@@ -353,7 +367,7 @@ function createPosterPlan(showId: string, title: string, date: string, artistCou
     },
     {
       concept: 'minimal typographic club poster, sharp and modern',
-      composition: 'oversized title typography with exact artist portraits in a neat grid or strip',
+      composition: artistCount > 1 ? 'oversized title typography with exact artist portraits in a neat grid or strip, one portrait per artist' : 'oversized title typography with one exact artist portrait, no repeated portrait strip',
       photoTreatment: 'small but crisp unchanged portrait crops with clear eyes and faces',
       palette: 'white, black, signal red, one accent color',
       typography: 'Swiss grid sans-serif, strong hierarchy, lots of breathing room',
@@ -361,7 +375,7 @@ function createPosterPlan(showId: string, title: string, date: string, artistCou
     },
     {
       concept: 'playful smiley-pattern comedy poster with strong ticket-sales energy',
-      composition: 'one hero comedian photo against a repeated graphic motif, other comedians as smaller badges',
+      composition: artistCount > 1 ? 'one hero comedian photo against a repeated graphic motif, other comedians as smaller badges' : 'one large hero comedian photo against a repeated graphic motif, no secondary portraits or badges',
       photoTreatment: 'source-photo cutouts preserved exactly, crisp edges, no cartooning',
       palette: 'yellow, black, white, small red accents',
       typography: 'heavy block title, compact date pill, bold footer callout',
@@ -369,7 +383,7 @@ function createPosterPlan(showId: string, title: string, date: string, artistCou
     },
     {
       concept: 'Nordic outdoor summer comedy poster, fresh and unexpected',
-      composition: 'artist photos arranged as natural editorial portraits over a scenic but graphic backdrop',
+      composition: artistCount > 1 ? 'artist photos arranged as natural editorial portraits over a scenic but graphic backdrop, one portrait per artist' : 'one natural editorial hero portrait over a scenic but graphic backdrop, no extra faces',
       photoTreatment: 'realistic source-photo integration, natural daylight grade, exact faces',
       palette: 'forest green, sky blue, white, warm yellow',
       typography: 'large friendly sans-serif title with clean festival-style info blocks',
@@ -377,7 +391,7 @@ function createPosterPlan(showId: string, title: string, date: string, artistCou
     },
     {
       concept: 'tabloid-premiere poster with big confidence and humor',
-      composition: 'tight crop portrait collage, oversized title across the middle like a headline',
+      composition: artistCount > 1 ? 'tight crop portrait collage with one crop per artist, oversized title across the middle like a headline' : 'single tight crop hero portrait with oversized title across the middle like a headline, no duplicate crops',
       photoTreatment: 'unchanged profile faces, high-contrast editorial press lighting',
       palette: 'black, white, red, saturated gold',
       typography: 'bold newspaper headline mixed with compact sans-serif credits',
