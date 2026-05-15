@@ -4,10 +4,11 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createShow, updateShowStatus } from '@/lib/actions/shows'
-import { acceptBookingOfferById, automateFullbookedShow, bookShow, cancelConfirmedSpotForOffer, runAutomaticBookingForShow, sendFallbackOffersForShow } from '@/lib/actions/booking'
+import { acceptBookingOfferById, automateFullbookedShow, bookShow, cancelConfirmedSpotForOffer, runAutomaticBookingForShow, sendFallbackOffersForShow, sendOffersForReopenedRequirement } from '@/lib/actions/booking'
 import { generateShowPoster } from '@/lib/actions/ai'
 import { runAfterResponse } from '@/lib/background'
-import type { BookingOfferStatus, ConfirmedSpotStatus, RequirementEnergy, RequirementGender, ShowStatus } from '@/types/database'
+import { canonicalRoleLabel } from '@/lib/artist-roles'
+import type { BookingOfferStatus, ConfirmedSpotStatus, RequirementCompensationType, RequirementEnergy, RequirementGender, ShowStatus } from '@/types/database'
 
 export type ManualSpotActionState = {
   status: 'idle' | 'success' | 'error'
@@ -34,13 +35,124 @@ function optionalMoneyToMinor(value: FormDataEntryValue | null) {
   return text.length > 0 ? Math.round(Number(text) * 100) : null
 }
 
-function tagsFromForm(value: FormDataEntryValue | null) {
-  const tags = String(value ?? '')
-    .split(',')
-    .map(tag => tag.trim())
-    .filter(Boolean)
+function optionalDecimal(value: FormDataEntryValue | null) {
+  const text = String(value ?? '').trim().replace(',', '.')
+  return text.length > 0 ? Number(text) : null
+}
 
-  return tags.length > 0 ? tags : null
+function optionalCompensationType(value: FormDataEntryValue | null): RequirementCompensationType | null {
+  return value === 'fixed' || value === 'percent' ? value : null
+}
+
+async function ensurePercentAllocationWithinLimit(
+  showId: string,
+  nextPercent: number | null,
+  reqId?: string
+) {
+  if (nextPercent == null) {
+    return
+  }
+
+  const db = createAdminClient()
+  const { data, error } = await db
+    .from('show_requirements')
+    .select('id, compensation_type, compensation_percent')
+    .eq('show_id', showId)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  const currentTotal = (data ?? []).reduce((sum, requirement) => {
+    if (reqId && requirement.id === reqId) {
+      return sum
+    }
+
+    if (requirement.compensation_type !== 'percent') {
+      return sum
+    }
+
+    return sum + Number(requirement.compensation_percent ?? 0)
+  }, 0)
+
+  if (currentTotal + nextPercent > 100.0001) {
+    throw new Error('Total prosent for lineupen kan ikke overstige 100%.')
+  }
+}
+
+async function nextLineupPosition(showId: string) {
+  const db = createAdminClient()
+  const { data, error } = await db
+    .from('show_requirements')
+    .select('lineup_position')
+    .eq('show_id', showId)
+    .order('lineup_position', { ascending: false })
+    .limit(1)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return Math.max(1, (data?.[0]?.lineup_position ?? 0) + 1)
+}
+
+async function normalizeRequirementPositions(showId: string) {
+  const db = createAdminClient()
+  const { data, error } = await db
+    .from('show_requirements')
+    .select('id')
+    .eq('show_id', showId)
+    .order('lineup_position')
+    .order('created_at')
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  const results = await Promise.all(
+    (data ?? []).map((requirement, index) =>
+      db
+        .from('show_requirements')
+        .update({ lineup_position: index + 1 })
+        .eq('id', requirement.id)
+        .eq('show_id', showId)
+    )
+  )
+
+  const firstError = results.find((result) => result.error)?.error
+  if (firstError) {
+    throw new Error(firstError.message)
+  }
+}
+
+async function getRequirementWriteInput(formData: FormData, showId: string) {
+  const compensationType = optionalCompensationType(formData.get('compensation_type'))
+  const compensationAmount = compensationType === 'fixed'
+    ? optionalMoneyToMinor(formData.get('compensation_amount'))
+    : null
+  const compensationPercent = compensationType === 'percent'
+    ? optionalDecimal(formData.get('compensation_percent'))
+    : null
+
+  if (compensationPercent != null && (Number.isNaN(compensationPercent) || compensationPercent < 0 || compensationPercent > 100)) {
+    throw new Error('Prosent må være mellom 0 og 100.')
+  }
+
+  if (compensationAmount != null && (Number.isNaN(compensationAmount) || compensationAmount < 0)) {
+    throw new Error('Fast beløp må være 0 eller høyere.')
+  }
+
+  return {
+    role_name: canonicalRoleLabel(String(formData.get('role_name') ?? '').trim()) ?? '',
+    quantity: Math.max(1, Number(formData.get('quantity') ?? 1)),
+    lineup_position: Math.max(1, Number(formData.get('lineup_position') ?? (await nextLineupPosition(showId)))),
+    min_score: optionalInteger(formData.get('min_score')),
+    energy_level: ((formData.get('energy_level') as RequirementEnergy | null) ?? 'any'),
+    required_gender: ((formData.get('required_gender') as RequirementGender | null) ?? 'any'),
+    compensation_type: compensationType,
+    compensation_amount: compensationAmount,
+    compensation_percent: compensationPercent,
+  }
 }
 
 function scheduleShowAutomation(showId: string, reason: string) {
@@ -101,24 +213,31 @@ export async function cloneShowAction(formData: FormData) {
     show_id: string
     role_name: string
     quantity: number
+    lineup_position: number
     min_score: number | null
     energy_level: RequirementEnergy
     required_gender: RequirementGender
-    required_tags: string[] | null
+    compensation_type: RequirementCompensationType | null
+    compensation_amount: number | null
+    compensation_percent: number | null
   }> = []
 
   let i = 0
   while (formData.has(`req_${i}_role_name`)) {
-    const roleName = String(formData.get(`req_${i}_role_name`) ?? '').trim()
+    const roleName = canonicalRoleLabel(String(formData.get(`req_${i}_role_name`) ?? '').trim())
     if (roleName) {
+      const compensationType = optionalCompensationType(formData.get(`req_${i}_compensation_type`))
       newReqs.push({
         show_id: show.id,
         role_name: roleName,
         quantity: Math.max(1, Number(formData.get(`req_${i}_quantity`) ?? 1)),
+        lineup_position: Math.max(1, Number(formData.get(`req_${i}_lineup_position`) ?? (i + 1))),
         min_score: optionalInteger(formData.get(`req_${i}_min_score`)),
         energy_level: ((formData.get(`req_${i}_energy_level`) as RequirementEnergy | null) ?? 'any'),
         required_gender: ((formData.get(`req_${i}_required_gender`) as RequirementGender | null) ?? 'any'),
-        required_tags: tagsFromForm(formData.get(`req_${i}_required_tags`)),
+        compensation_type: compensationType,
+        compensation_amount: compensationType === 'fixed' ? optionalMoneyToMinor(formData.get(`req_${i}_compensation_amount`)) : null,
+        compensation_percent: compensationType === 'percent' ? optionalDecimal(formData.get(`req_${i}_compensation_percent`)) : null,
       })
     }
     i++
@@ -128,17 +247,22 @@ export async function cloneShowAction(formData: FormData) {
   if (newReqs.length === 0) {
     const { data: templateReqs } = await db
       .from('show_requirements')
-      .select('role_name, quantity, min_score, energy_level, required_gender, required_tags')
+      .select('role_name, quantity, lineup_position, min_score, energy_level, required_gender, compensation_type, compensation_amount, compensation_percent')
       .eq('show_id', templateId)
+      .order('lineup_position')
+      .order('created_at')
     for (const r of templateReqs ?? []) {
       newReqs.push({
         show_id: show.id,
-        role_name: r.role_name,
+        role_name: canonicalRoleLabel(r.role_name) ?? r.role_name,
         quantity: r.quantity,
+        lineup_position: r.lineup_position,
         min_score: r.min_score,
         energy_level: r.energy_level as RequirementEnergy,
         required_gender: ((r as { required_gender?: string }).required_gender as RequirementGender | undefined) ?? 'any',
-        required_tags: r.required_tags,
+        compensation_type: (r.compensation_type as RequirementCompensationType | null) ?? null,
+        compensation_amount: r.compensation_amount,
+        compensation_percent: r.compensation_percent,
       })
     }
   }
@@ -154,20 +278,43 @@ export async function cloneShowAction(formData: FormData) {
 export async function addRequirementAction(formData: FormData) {
   const showId = formData.get('show_id') as string
   const db = createAdminClient()
-  await db.from('show_requirements').insert({
+  const input = await getRequirementWriteInput(formData, showId)
+
+  await ensurePercentAllocationWithinLimit(showId, input.compensation_percent)
+
+  const { error } = await db.from('show_requirements').insert({
     show_id: showId,
-    role_name: formData.get('role_name') as string,
-    quantity: Math.max(1, Number(formData.get('quantity') ?? 1)),
-    min_score: optionalInteger(formData.get('min_score')),
-    energy_level: ((formData.get('energy_level') as RequirementEnergy | null) ?? 'any'),
-    required_gender: ((formData.get('required_gender') as RequirementGender | null) ?? 'any'),
-    required_tags: tagsFromForm(formData.get('required_tags')),
+    ...input,
   })
+
+  if (error) throw new Error(error.message)
   revalidatePath(`/admin-app/shows/${showId}`)
 }
 
 export async function startBookingAction(formData: FormData) {
   const showId = formData.get('show_id') as string
+  const db = createAdminClient()
+
+  const { data: reqs, error: reqError } = await db
+    .from('show_requirements')
+    .select('role_name, compensation_type, compensation_amount, compensation_percent')
+    .eq('show_id', showId)
+
+  if (reqError) throw new Error(reqError.message)
+  if (!reqs || reqs.length === 0) throw new Error('Legg til minst én lineup-plass før booking startes.')
+
+  for (const req of reqs) {
+    if (!req.role_name?.trim()) throw new Error('Alle lineup-plasser må ha et rollenavn.')
+    if (!req.compensation_type) throw new Error('Alle lineup-plasser må ha honorarmodell satt.')
+    if (req.compensation_type === 'fixed' && req.compensation_amount == null) throw new Error('Alle faste honorarer må ha et beløp.')
+    if (req.compensation_type === 'percent' && req.compensation_percent == null) throw new Error('Alle prosentbaserte honorarer må ha en prosentsats.')
+  }
+
+  const percentTotal = reqs
+    .filter((r) => r.compensation_type === 'percent')
+    .reduce((sum, r) => sum + (r.compensation_percent ?? 0), 0)
+  if (percentTotal > 100) throw new Error(`Prosentfordeling overstiger 100 % (${percentTotal} %).`)
+
   scheduleShowAutomation(showId, 'manual-start')
   revalidatePath(`/admin-app/shows/${showId}`)
 }
@@ -209,17 +356,38 @@ export async function updateRequirementAction(formData: FormData) {
   const showId = formData.get('show_id') as string
   const reqId = formData.get('req_id') as string
   const db = createAdminClient()
+  const input = await getRequirementWriteInput(formData, showId)
 
-  const { error } = await db.from('show_requirements').update({
-    role_name: String(formData.get('role_name') ?? '').trim(),
-    quantity: Math.max(1, Number(formData.get('quantity') ?? 1)),
-    min_score: optionalInteger(formData.get('min_score')),
-    energy_level: ((formData.get('energy_level') as RequirementEnergy | null) ?? 'any'),
-    required_gender: ((formData.get('required_gender') as RequirementGender | null) ?? 'any'),
-    required_tags: tagsFromForm(formData.get('required_tags')),
-  }).eq('id', reqId)
+  await ensurePercentAllocationWithinLimit(showId, input.compensation_percent, reqId)
+
+  const { error } = await db.from('show_requirements').update(input).eq('id', reqId)
 
   if (error) throw new Error(error.message)
+  revalidatePath(`/admin-app/shows/${showId}`)
+}
+
+export async function reorderRequirementsAction(formData: FormData) {
+  const showId = String(formData.get('show_id') ?? '')
+  const orderedIds = JSON.parse(String(formData.get('ordered_ids') ?? '[]')) as string[]
+
+  if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
+    throw new Error('Mangler lineup-rekkefølge.')
+  }
+
+  const db = createAdminClient()
+  const results = await Promise.all(
+    orderedIds.map((id, index) =>
+      db
+        .from('show_requirements')
+        .update({ lineup_position: index + 1 })
+        .eq('show_id', showId)
+        .eq('id', id)
+    )
+  )
+
+  const firstError = results.find((result) => result.error)?.error
+  if (firstError) throw new Error(firstError.message)
+
   revalidatePath(`/admin-app/shows/${showId}`)
 }
 
@@ -227,7 +395,9 @@ export async function deleteRequirementAction(formData: FormData) {
   const showId = formData.get('show_id') as string
   const reqId = formData.get('req_id') as string
   const db = createAdminClient()
-  await db.from('show_requirements').delete().eq('id', reqId)
+  const { error } = await db.from('show_requirements').delete().eq('id', reqId)
+  if (error) throw new Error(error.message)
+  await normalizeRequirementPositions(showId)
   scheduleFullbookedAutomation(showId, 'delete-requirement')
   revalidatePath(`/admin-app/shows/${showId}`)
 }
@@ -237,7 +407,7 @@ export async function bookShowAction(formData: FormData) {
   const result = await bookShow(showId)
   if (result.offersCreated === 0) {
     throw new Error(result.candidatesMatched === 0
-      ? 'Fant ingen godkjente artister som matcher score-, energi- og tagkravene.'
+      ? 'Fant ingen godkjente artister som matcher score- og energikravene.'
       : 'Ingen nye bookingtilbud ble sendt. Matchende artister har allerede fått tilbud eller er i lineupen.')
   }
   revalidatePath(`/admin-app/shows/${showId}`)
@@ -299,6 +469,174 @@ export async function removeSpotAction(formData: FormData) {
   revalidatePath(`/admin-app/shows/${showId}`)
 }
 
+export async function removeSpotAndReopenAction(formData: FormData) {
+  const spotId = formData.get('spot_id') as string
+  const showId = formData.get('show_id') as string
+  const db = createAdminClient()
+
+  const { data: spot } = await db
+    .from('confirmed_spots')
+    .select('id, artist_id, show_requirement_id')
+    .eq('id', spotId)
+    .single()
+
+  if (!spot) throw new Error('Spot ikke funnet.')
+
+  // Cancel active offers for this requirement so the slot re-opens cleanly
+  await db
+    .from('booking_offers')
+    .update({ status: 'cancelled' })
+    .eq('show_id', showId)
+    .eq('show_requirement_id', spot.show_requirement_id)
+    .eq('status', 'sent')
+
+  // Cancel the spot
+  await db
+    .from('confirmed_spots')
+    .update({ status: 'cancelled', cancelled_at: new Date().toISOString() })
+    .eq('id', spotId)
+
+  // Send new offers with "Ledig spot" email in background
+  runAfterResponse(`reopen-spot-${spotId}`, async () => {
+    await sendOffersForReopenedRequirement(showId, spot.show_requirement_id)
+    revalidatePath(`/admin-app/shows/${showId}`)
+    revalidatePath('/admin-app/bookings')
+  })
+
+  revalidatePath(`/admin-app/shows/${showId}`)
+}
+
+export async function moveSpotAction(formData: FormData) {
+  const spotId = formData.get('spot_id') as string
+  const newReqId = formData.get('show_requirement_id') as string
+  const showId = formData.get('show_id') as string
+  const db = createAdminClient()
+
+  const [{ data: req }, { count: filled }] = await Promise.all([
+    db.from('show_requirements').select('quantity').eq('id', newReqId).single(),
+    db.from('confirmed_spots')
+      .select('*', { count: 'exact', head: true })
+      .eq('show_requirement_id', newReqId)
+      .in('status', ['confirmed', 'completed', 'paid']),
+  ])
+
+  if (req && (filled ?? 0) >= req.quantity) {
+    throw new Error('Denne rollen er allerede fylt.')
+  }
+
+  const { error } = await db
+    .from('confirmed_spots')
+    .update({ show_requirement_id: newReqId })
+    .eq('id', spotId)
+
+  if (error) throw new Error(error.message)
+  revalidatePath(`/admin-app/shows/${showId}`)
+}
+
+export async function swapArtistAction(formData: FormData) {
+  const spotId = formData.get('spot_id') as string
+  const newArtistId = formData.get('new_artist_id') as string
+  const showId = formData.get('show_id') as string
+  const db = createAdminClient()
+
+  const { data: oldSpot } = await db
+    .from('confirmed_spots')
+    .select('show_requirement_id, fee_amount, currency')
+    .eq('id', spotId)
+    .single()
+
+  if (!oldSpot) throw new Error('Spot ikke funnet.')
+
+  const { data: existingSpot } = await db
+    .from('confirmed_spots')
+    .select('id')
+    .eq('show_id', showId)
+    .eq('artist_id', newArtistId)
+    .in('status', ['confirmed', 'completed', 'paid'])
+    .maybeSingle()
+
+  if (existingSpot) throw new Error('Denne artisten er allerede i lineupen.')
+
+  await db
+    .from('confirmed_spots')
+    .update({ status: 'cancelled', cancelled_at: new Date().toISOString() })
+    .eq('id', spotId)
+
+  const { error } = await db
+    .from('confirmed_spots')
+    .insert({
+      show_id: showId,
+      artist_id: newArtistId,
+      show_requirement_id: oldSpot.show_requirement_id,
+      fee_amount: oldSpot.fee_amount,
+      currency: oldSpot.currency ?? 'NOK',
+      status: 'confirmed',
+      confirmed_at: new Date().toISOString(),
+    })
+
+  if (error) throw new Error(error.message)
+  revalidatePath(`/admin-app/shows/${showId}`)
+}
+
+export async function addArtistToRequirementAction(formData: FormData) {
+  const showId = formData.get('show_id') as string
+  const artistId = formData.get('artist_id') as string
+  const requirementId = formData.get('show_requirement_id') as string
+  const currency = (formData.get('currency') as string | null) ?? 'NOK'
+  const db = createAdminClient()
+
+  const { data: existingSpot } = await db
+    .from('confirmed_spots')
+    .select('id')
+    .eq('show_id', showId)
+    .eq('artist_id', artistId)
+    .in('status', ['confirmed', 'completed', 'paid'])
+    .maybeSingle()
+
+  if (existingSpot) throw new Error('Denne artisten er allerede i lineupen.')
+
+  const [{ count: filled }, { data: requirement }] = await Promise.all([
+    db.from('confirmed_spots')
+      .select('*', { count: 'exact', head: true })
+      .eq('show_requirement_id', requirementId)
+      .in('status', ['confirmed', 'completed', 'paid']),
+    db.from('show_requirements')
+      .select('quantity, compensation_type, compensation_amount')
+      .eq('id', requirementId)
+      .single(),
+  ])
+
+  if (requirement && (filled ?? 0) >= requirement.quantity) {
+    throw new Error('Denne rollen er allerede fylt.')
+  }
+
+  const feeAmount = requirement?.compensation_type === 'fixed' ? requirement.compensation_amount : null
+
+  const { data: spot, error } = await db.from('confirmed_spots').insert({
+    show_id: showId,
+    artist_id: artistId,
+    show_requirement_id: requirementId,
+    fee_amount: feeAmount,
+    currency,
+    status: 'confirmed',
+    confirmed_at: new Date().toISOString(),
+  }).select('id').single()
+
+  if (error) throw new Error(error.message)
+
+  // Mark pending offers for this requirement as filled
+  await db
+    .from('booking_offers')
+    .update({ status: 'filled_by_other' })
+    .eq('show_id', showId)
+    .eq('show_requirement_id', requirementId)
+    .eq('status', 'sent')
+
+  await db.from('shows').update({ status: 'booking' }).eq('id', showId).in('status', ['draft'])
+  scheduleFullbookedAutomation(showId, 'add-artist-spot')
+  revalidatePath(`/admin-app/shows/${showId}`)
+}
+
 export async function addManualSpotAction(_prevState: ManualSpotActionState, formData: FormData): Promise<ManualSpotActionState> {
   const showId = formData.get('show_id') as string
   const artistId = formData.get('artist_id') as string
@@ -347,17 +685,6 @@ export async function addManualSpotAction(_prevState: ManualSpotActionState, for
   }).select('id').single()
 
   if (error) return manualSpotState('error', error.message)
-
-  if (spot && feeAmount !== null) {
-    await db.from('artist_payouts').insert({
-      artist_id: artistId,
-      confirmed_spot_id: spot.id,
-      show_id: showId,
-      amount: feeAmount,
-      currency,
-      status: 'pending',
-    })
-  }
 
   await db.from('shows').update({ status: 'booking' }).eq('id', showId).in('status', ['draft'])
   scheduleFullbookedAutomation(showId, 'manual-spot')

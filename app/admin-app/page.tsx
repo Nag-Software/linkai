@@ -2,8 +2,8 @@ import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { AdminHeader } from '@/components/admin/admin-header'
 import {
-  UserCheck, BrainCircuit,
-  Ticket, CreditCard, Wallet, Clock, AlertCircle,
+  UserCheck,
+  Ticket, CreditCard, Clock, AlertCircle,
   ArrowRight, ChevronRight, MapPin,
 } from 'lucide-react'
 
@@ -31,8 +31,6 @@ async function getDashboardData() {
 
   const [
     { count: pendingArtists },
-    { count: aiPending },
-    { count: pendingPayouts },
     { count: pendingOffers },
     { count: approvedArtists },
     { count: soldTickets },
@@ -44,8 +42,6 @@ async function getDashboardData() {
     { count: publishedShows },
   ] = await Promise.all([
     db.from('artists').select('id', { count: 'exact', head: true }).eq('status', 'pending_review'),
-    db.from('artist_ai_assessments').select('id', { count: 'exact', head: true }).eq('ai_status', 'pending'),
-    db.from('artist_payouts').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
     db.from('booking_offers').select('id', { count: 'exact', head: true }).eq('status', 'sent'),
     db.from('artists').select('id', { count: 'exact', head: true }).eq('status', 'approved'),
     db.from('tickets').select('id', { count: 'exact', head: true }).in('status', ['valid', 'used']),
@@ -80,8 +76,6 @@ async function getDashboardData() {
 
   return {
     pendingArtists: pendingArtists ?? 0,
-    aiPending: aiPending ?? 0,
-    pendingPayouts: pendingPayouts ?? 0,
     pendingOffers: pendingOffers ?? 0,
     approvedArtists: approvedArtists ?? 0,
     soldTickets: soldTickets ?? 0,
@@ -107,9 +101,7 @@ export default async function AdminDashboardPage() {
 
   const actions = [
     { label: 'Venter godkjenning', value: data.pendingArtists, href: '/admin-app/artists', icon: Clock },
-    { label: 'AI-vurdering pending', value: data.aiPending, href: '/admin-app/artists', icon: BrainCircuit },
     { label: 'Tilbud uten svar', value: data.pendingOffers, href: '/admin-app/bookings', icon: AlertCircle },
-    { label: 'Artistutbetaling venter', value: data.pendingPayouts, href: '/admin-app/artist-economy', icon: Wallet },
   ]
 
   const pipeline = [

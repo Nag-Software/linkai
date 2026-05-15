@@ -1,6 +1,29 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+function hasSupabaseAuthCookie(request: NextRequest) {
+  return request.cookies
+    .getAll()
+    .some(({ name }) => name.startsWith('sb-') && name.includes('-auth-token'))
+}
+
+function isTimeoutError(error: unknown) {
+  if (!error || typeof error !== 'object') return false
+
+  const maybeError = error as {
+    name?: unknown
+    message?: unknown
+    code?: unknown
+  }
+
+  return (
+    maybeError.name === 'TimeoutError' ||
+    maybeError.code === 23 ||
+    (typeof maybeError.message === 'string' &&
+      /aborted due to timeout|timed out|timeout/i.test(maybeError.message))
+  )
+}
+
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   const host = request.headers.get('host') ?? request.nextUrl.host
@@ -31,27 +54,35 @@ export async function proxy(request: NextRequest) {
     response = NextResponse.next({ request: { headers: requestHeaders } })
   }
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
+  if (hasSupabaseAuthCookie(request)) {
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll()
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value }) =>
+              request.cookies.set(name, value)
+            )
+            cookiesToSet.forEach(({ name, value, options }) =>
+              response.cookies.set(name, value, options)
+            )
+          },
         },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          )
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          )
-        },
-      },
-    }
-  )
+      }
+    )
 
-  await supabase.auth.getUser()
+    try {
+      await supabase.auth.getUser()
+    } catch (error) {
+      if (!isTimeoutError(error)) {
+        console.error('[proxy] Supabase auth refresh failed:', error)
+      }
+    }
+  }
 
   return response
 }

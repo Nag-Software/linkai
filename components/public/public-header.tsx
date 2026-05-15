@@ -10,8 +10,8 @@ export function PublicHeader({ transparent, tone = 'dark' }: { transparent?: boo
           humor.events
         </Link>
         <nav className={`flex items-center gap-5 text-sm ${isLight ? 'text-zinc-600' : 'text-white/55'}`}>
-          <Link href="/events" className={`transition-colors ${isLight ? 'hover:text-zinc-950' : 'hover:text-white'}`}>Events</Link>
-          <Link href="/artists" className={`transition-colors ${isLight ? 'hover:text-zinc-950' : 'hover:text-white'}`}>Artister</Link>
+          <Link href="/events" className={`transition-colors ${isLight ? 'hover:text-zinc-950' : 'hover:text-white'}`}>Eventer</Link>
+          <Link href="/artists" className={`transition-colors ${isLight ? 'hover:text-zinc-950' : 'hover:text-white'}`}>Komikere</Link>
         </nav>
       </div>
     </header>

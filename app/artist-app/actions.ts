@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { getCurrentArtist } from '@/lib/artist-portal'
+import { canonicalRoleValues } from '@/lib/artist-roles'
 
 const MIN_BOOKABLE_SCORE = 6
 
@@ -21,6 +22,7 @@ export async function updateArtistProfileAction(formData: FormData) {
   }
 
   const socialLinks = socialLinksFromForm(formData)
+  const categoryValues = canonicalRoleValues(formData.getAll('category').map((value) => String(value)))
 
   await db.from('artists').update({
     full_name: textValue(formData.get('full_name')) ?? artist.full_name,
@@ -28,7 +30,7 @@ export async function updateArtistProfileAction(formData: FormData) {
     phone: textValue(formData.get('phone')) ?? null,
     profile_image_url: profileImageUrl,
     bio: textValue(formData.get('bio')) ?? null,
-    category: textValue(formData.get('category')) ?? null,
+    category: categoryValues.length > 0 ? categoryValues : null,
     language: textValue(formData.get('language')) ?? null,
     social_links: socialLinks,
   }).eq('id', artist.id)

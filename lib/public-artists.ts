@@ -11,7 +11,6 @@ export type PublicArtist = Pick<Artist,
   | 'language'
   | 'admin_score'
   | 'admin_energy_level'
-  | 'admin_tags'
   | 'social_links'
 >
 
@@ -23,12 +22,13 @@ export type PublicArtistShow = Pick<Show,
   | 'start_time'
   | 'end_time'
   | 'venue_name'
+  | 'venue_address'
   | 'poster_url'
 > & {
   role_name: string | null
 }
 
-const PUBLIC_ARTIST_FIELDS = 'id, full_name, stage_name, profile_image_url, bio, category, language, admin_score, admin_energy_level, admin_tags, social_links'
+const PUBLIC_ARTIST_FIELDS = 'id, full_name, stage_name, profile_image_url, bio, category, language, admin_score, admin_energy_level, social_links'
 
 export async function getPublicArtists(): Promise<PublicArtist[]> {
   const db = createAdminClient()
@@ -69,11 +69,11 @@ export async function getPublicArtistShows(artistId: string): Promise<PublicArti
     showIds.length
       ? db
           .from('shows')
-          .select('id, title, slug, date, start_time, end_time, venue_name, poster_url')
+          .select('id, title, slug, date, start_time, end_time, venue_name, venue_address, poster_url')
           .in('id', showIds)
           .eq('status', 'published')
           .order('date', { ascending: true })
-      : Promise.resolve({ data: [] as Array<Pick<Show, 'id' | 'title' | 'slug' | 'date' | 'start_time' | 'end_time' | 'venue_name' | 'poster_url'>> }),
+      : Promise.resolve({ data: [] as Array<Pick<Show, 'id' | 'title' | 'slug' | 'date' | 'start_time' | 'end_time' | 'venue_name' | 'venue_address' | 'poster_url'>> }),
     requirementIds.length
       ? db.from('show_requirements').select('id, role_name').in('id', requirementIds)
       : Promise.resolve({ data: [] as Array<{ id: string; role_name: string }> }),

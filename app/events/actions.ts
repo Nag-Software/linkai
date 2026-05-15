@@ -1,27 +1,17 @@
 'use server'
 
-import { cookies, headers } from 'next/headers'
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createCheckoutSession } from '@/lib/actions/checkout'
-import { trackInitiateCheckout } from '@/lib/tracking/stape'
 
 export async function startCheckoutAction(formData: FormData) {
   const showId = String(formData.get('show_id') ?? '')
   const slug = String(formData.get('slug') ?? '')
   const headerStore = await headers()
-  const cookieStore = await cookies()
   const host = headerStore.get('host') ?? 'localhost:3000'
   const protocol = headerStore.get('x-forwarded-proto') ?? 'http'
   const sourceUrl = `${protocol}://${host}/events/${slug}`
-
-  trackInitiateCheckout(showId, {
-    sourceUrl,
-    userAgent: headerStore.get('user-agent') ?? undefined,
-    ipAddress: headerStore.get('x-forwarded-for')?.split(',')[0]?.trim() ?? headerStore.get('x-real-ip') ?? undefined,
-    fbp: cookieStore.get('_fbp')?.value,
-    fbc: cookieStore.get('_fbc')?.value,
-  }).catch((error) => console.error('[Stape] InitiateCheckout failed:', error))
 
   // Check for external ticket URL — if set, redirect directly
   const db = createAdminClient()

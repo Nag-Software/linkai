@@ -4,39 +4,31 @@ import Image from 'next/image'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { AdminHeader } from '@/components/admin/admin-header'
 import { ToastActionForm } from '@/components/toast-action-form'
-import { ManualSpotForm } from './manual-spot-form'
 import { DeleteButton } from '@/components/admin/delete-button'
-import { shouldBypassImageOptimization } from '@/lib/utils'
 import {
-  addRequirementAction,
-  deleteRequirementAction,
   deleteShowAction,
   generatePosterAction,
-  removeSpotAction,
-  sendFallbackOffersAction,
-  startBookingAction,
   updateShowDetailsAction,
-  updateRequirementAction,
 } from '../actions'
+import { RequirementsTab } from './requirements-tab'
+import { LineupTab } from './lineup-tab'
+import type { RequirementCompensationType, RequirementEnergy, RequirementGender } from '@/types/database'
 
 type ShowTab = 'overview' | 'requirements' | 'lineup' | 'marketing' | 'tickets'
-type LineupMode = 'auto' | 'manual'
 
 export default async function ShowDetailPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ tab?: ShowTab; mode?: LineupMode }>
+  searchParams: Promise<{ tab?: ShowTab }>
 }) {
   const { id } = await params
-  const { tab = 'overview', mode = 'auto' } = await searchParams
-  const lineupMode: LineupMode = mode === 'manual' ? 'manual' : 'auto'
+  const { tab = 'overview' } = await searchParams
   const db = createAdminClient()
   const shouldLoadTickets = tab === 'tickets'
   const shouldLoadMarketingTasks = tab === 'marketing'
   const shouldLoadRelatedArtists = tab === 'lineup' || tab === 'marketing'
-  const shouldLoadLineupRequirements = tab === 'lineup'
   const shouldLoadSelectableArtists = tab === 'lineup'
 
   const [
@@ -48,7 +40,7 @@ export default async function ShowDetailPage({
     { data: marketingTasks },
   ] = await Promise.all([
     db.from('shows').select('*').eq('id', id).single(),
-    db.from('show_requirements').select('*').eq('show_id', id).order('created_at'),
+    db.from('show_requirements').select('*').eq('show_id', id).order('lineup_position').order('created_at'),
     db.from('booking_offers').select('*').eq('show_id', id).order('created_at', { ascending: false }),
     db.from('confirmed_spots').select('*').eq('show_id', id),
     shouldLoadTickets
@@ -65,25 +57,20 @@ export default async function ShowDetailPage({
   const offerArtistIds = [...new Set((offers ?? []).map(o => o.artist_id))]
   const lineupArtistIds = [...new Set((lineup ?? []).map(s => s.artist_id))]
   const allArtistIds = [...new Set([...offerArtistIds, ...lineupArtistIds])]
-  const lineupReqIds = [...new Set((lineup ?? []).map(s => s.show_requirement_id).filter((x): x is string => !!x))]
 
-  const [{ data: artistRows }, { data: reqRows }, { data: selectableArtists }] = await Promise.all([
+  const [{ data: artistRows }, { data: selectableArtists }] = await Promise.all([
     shouldLoadRelatedArtists && allArtistIds.length
       ? db.from('artists').select('id, full_name, stage_name, email, profile_image_url, admin_score, admin_energy_level').in('id', allArtistIds)
       : Promise.resolve({ data: [] as Array<{ id: string; full_name: string; stage_name: string | null; email: string; profile_image_url: string | null; admin_score: number | null; admin_energy_level: string | null }> }),
-    shouldLoadLineupRequirements && lineupReqIds.length
-      ? db.from('show_requirements').select('id, role_name').in('id', lineupReqIds)
-      : Promise.resolve({ data: [] as Array<{ id: string; role_name: string }> }),
     shouldLoadSelectableArtists
       ? db.from('artists')
-        .select('id, full_name, stage_name, email, admin_score, admin_energy_level, admin_tags')
+        .select('id, full_name, stage_name, email, admin_score, admin_energy_level')
         .eq('status', 'approved')
         .order('full_name')
         .limit(250)
-      : Promise.resolve({ data: [] as Array<{ id: string; full_name: string; stage_name: string | null; email: string; admin_score: number | null; admin_energy_level: string | null; admin_tags: string[] | null }> }),
+      : Promise.resolve({ data: [] as Array<{ id: string; full_name: string; stage_name: string | null; email: string; admin_score: number | null; admin_energy_level: string | null }> }),
   ])
   const artistMap = Object.fromEntries((artistRows ?? []).map(a => [a.id, a]))
-  const reqMap = Object.fromEntries((reqRows ?? []).map(r => [r.id, r]))
 
   // Compute fill status per requirement
   const activeLineup = (lineup ?? []).filter(s => ['confirmed', 'completed', 'paid'].includes(s.status))
@@ -96,10 +83,6 @@ export default async function ShowDetailPage({
   const totalSlots = reqFillStatus.reduce((s, r) => s + r.quantity, 0)
   const totalFilled = reqFillStatus.reduce((s, r) => s + Math.min(r.filled, r.quantity), 0)
   const activeArtistIds = new Set(activeLineup.map(spot => spot.artist_id))
-  const manualSelectableArtists = (selectableArtists ?? []).filter(artist => !activeArtistIds.has(artist.id))
-  const manualOpenRequirements = reqFillStatus
-    .filter(req => req.filled < req.quantity)
-    .map(req => ({ id: req.id, role_name: req.role_name, quantity: req.quantity, filled: req.filled }))
 
   const offerStats = {
     total: (offers ?? []).length,
@@ -231,22 +214,6 @@ export default async function ShowDetailPage({
             )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <div className="rounded-xl border bg-card p-5 space-y-3">
-                <h2 className="font-semibold text-sm">Tilbud sendt</h2>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { label: 'Totalt', value: offerStats.total, color: 'text-foreground' },
-                    { label: 'Venter', value: offerStats.sent, color: 'text-amber-600' },
-                    { label: 'Akseptert', value: offerStats.accepted, color: 'text-emerald-600' },
-                  ].map(s => (
-                    <div key={s.label} className="text-center rounded-lg bg-muted p-2">
-                      <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">{s.label}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
               <div className="rounded-xl border bg-card p-5 space-y-2">
                 <h2 className="font-semibold text-sm">Info</h2>
                 <dl className="space-y-1.5 text-sm">
@@ -348,7 +315,7 @@ export default async function ShowDetailPage({
                     </button>
                   </ToastActionForm>
                 </div>
-                <div className="relative h-96 w-full overflow-hidden rounded-lg border bg-muted/20">
+                <div className="relative aspect-[3/4] w-full overflow-hidden rounded-lg border bg-muted/20">
                   <Image src={show.poster_url} alt={`Plakat for ${show.title}`} fill sizes="(max-width: 768px) 92vw, 50vw" className="object-contain" />
                 </div>
               </div>
@@ -358,429 +325,66 @@ export default async function ShowDetailPage({
 
         {/* ══════════════════ REQUIREMENTS ══════════════════ */}
         {tab === 'requirements' && (
-          <div className="space-y-6 max-w-3xl">
-            {reqFillStatus.length > 0 && (
-              <div className="space-y-3">
-                {reqFillStatus.map((r) => (
-                  <div key={r.id} className="rounded-xl border bg-card p-4 space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="flex items-center gap-2">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${r.isFull ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                          {r.isFull ? '✓ Fylt' : `${r.filled}/${r.quantity}`}
-                        </span>
-                        <span className="text-xs text-muted-foreground">{r.pendingOffers} ventende tilbud</span>
-                      </div>
-                      <ToastActionForm action={deleteRequirementAction}>
-                        <input type="hidden" name="show_id" value={show.id} />
-                        <input type="hidden" name="req_id" value={r.id} />
-                        <button type="submit" className="text-xs text-destructive hover:underline">Slett krav</button>
-                      </ToastActionForm>
-                    </div>
-                    <ToastActionForm action={updateRequirementAction} className="space-y-3">
-                      <input type="hidden" name="show_id" value={show.id} />
-                      <input type="hidden" name="req_id" value={r.id} />
-                      <div className="grid grid-cols-3 gap-3">
-                        <label className="space-y-1 col-span-1">
-                          <span className="text-xs font-medium text-muted-foreground">Rolle</span>
-                          <input name="role_name" required defaultValue={r.role_name} className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
-                        </label>
-                        <label className="space-y-1">
-                          <span className="text-xs font-medium text-muted-foreground">Antall</span>
-                          <input name="quantity" type="number" min={1} defaultValue={r.quantity} className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
-                        </label>
-                        <label className="space-y-1">
-                          <span className="text-xs font-medium text-muted-foreground">Min score</span>
-                          <input name="min_score" type="number" min={1} max={10} defaultValue={r.min_score ?? ''} className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
-                        </label>
-                      </div>
-                      <ShowChipGroup
-                        label="Energinivå"
-                        name="energy_level"
-                        current={r.energy_level}
-                        chips={[
-                          { value: 'any', label: 'Alle' },
-                          { value: 'high', label: 'Høy' },
-                          { value: 'medium', label: 'Middels' },
-                          { value: 'low', label: 'Lav' },
-                        ]}
-                      />
-                      <ShowChipGroup
-                        label="Kjønn"
-                        name="required_gender"
-                        current={r.required_gender}
-                        chips={[
-                          { value: 'any', label: 'Alle' },
-                          { value: 'male', label: 'Mann' },
-                          { value: 'female', label: 'Dame' },
-                        ]}
-                      />
-                      <div className="flex gap-3">
-                        <label className="space-y-1 flex-1">
-                          <span className="text-xs font-medium text-muted-foreground">Tags</span>
-                          <input name="required_tags" defaultValue={(r.required_tags ?? []).join(', ')} className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
-                        </label>
-                        <div className="flex items-end">
-                          <button type="submit" className="px-4 py-2 rounded-md border text-sm font-medium hover:bg-muted transition-colors whitespace-nowrap">Lagre</button>
-                        </div>
-                      </div>
-                    </ToastActionForm>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {['draft', 'booking', 'fullbooked'].includes(show.status) && (
-              <div className="rounded-xl border bg-card p-5 space-y-4">
-                <h2 className="font-semibold text-sm">Legg til bookingbehov</h2>
-                <ToastActionForm action={addRequirementAction} className="space-y-3">
-                  <input type="hidden" name="show_id" value={show.id} />
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="space-y-1 col-span-1">
-                      <label className="text-xs font-medium text-muted-foreground">Rolle *</label>
-                      <input name="role_name" required placeholder="headliner, support, opener…"
-                        className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium text-muted-foreground">Antall</label>
-                      <input name="quantity" type="number" min={1} defaultValue={1}
-                        className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium text-muted-foreground">Min score (1–10)</label>
-                      <input name="min_score" type="number" min={1} max={10} placeholder="7"
-                        className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
-                    </div>
-                  </div>
-                  <ShowChipGroup
-                    label="Energinivå"
-                    name="energy_level"
-                    current="any"
-                    chips={[
-                      { value: 'any', label: 'Alle' },
-                      { value: 'high', label: 'Høy' },
-                      { value: 'medium', label: 'Middels' },
-                      { value: 'low', label: 'Lav' },
-                    ]}
-                  />
-                  <ShowChipGroup
-                    label="Kjønn"
-                    name="required_gender"
-                    current="any"
-                    chips={[
-                      { value: 'any', label: 'Alle' },
-                      { value: 'male', label: 'Mann' },
-                      { value: 'female', label: 'Dame' },
-                    ]}
-                  />
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Tags (kommaseparert)</label>
-                    <input name="required_tags" placeholder="jazz, folk, electro"
-                      className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
-                  </div>
-                  <button type="submit" className="px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">
-                    Legg til krav
-                  </button>
-                </ToastActionForm>
-              </div>
-            )}
-
-            {(requirements ?? []).length > 0 && ['draft', 'booking'].includes(show.status) && (
-              <ToastActionForm
-                action={startBookingAction}
-                successMessage="Booking startet! Tilbud sendes ut til matchende artister."
-                className="rounded-xl border-2 border-primary/30 bg-primary/5 px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
-              >
-                <input type="hidden" name="show_id" value={show.id} />
-                <div>
-                  <div className="font-semibold text-sm">Klar til å starte booking?</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">
-                    Sender tilbud til godkjente artister som matcher kravene ovenfor.
-                  </div>
-                </div>
-                <button
-                  type="submit"
-                  className="shrink-0 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
-                >
-                  Start booking →
-                </button>
-              </ToastActionForm>
-            )}
-          </div>
+          <RequirementsTab
+            key={(requirements ?? []).map((r) => [
+              r.id,
+              r.lineup_position,
+              r.role_name,
+              r.min_score ?? '',
+              r.energy_level,
+              r.required_gender ?? 'any',
+              r.compensation_type ?? '',
+              r.compensation_amount ?? '',
+              r.compensation_percent ?? '',
+            ].join(':')).join('|')}
+            showId={show.id}
+            showStatus={show.status}
+            showCurrency={show.currency}
+            requirements={(requirements ?? []).map((r) => ({
+              id: r.id,
+              lineup_position: r.lineup_position,
+              role_name: r.role_name,
+              min_score: r.min_score ?? null,
+              energy_level: r.energy_level as RequirementEnergy,
+              required_gender: (r.required_gender ?? 'any') as RequirementGender,
+              compensation_type: (r.compensation_type ?? null) as RequirementCompensationType | null,
+              compensation_amount: r.compensation_amount ?? null,
+              compensation_percent: r.compensation_percent ?? null,
+            }))}
+          />
         )}
 
         {/* ══════════════════ LINEUP ══════════════════ */}
         {tab === 'lineup' && (
-          <div className="space-y-5">
-
-            {/* Controls row */}
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex rounded-md border bg-muted/40 p-1">
-                <Link
-                  href={`/admin-app/shows/${id}?tab=lineup&mode=auto`}
-                  className={`rounded px-3 py-1.5 text-sm font-medium transition-colors ${lineupMode === 'auto' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-                >
-                  Auto
-                </Link>
-                <Link
-                  href={`/admin-app/shows/${id}?tab=lineup&mode=manual`}
-                  className={`rounded px-3 py-1.5 text-sm font-medium transition-colors ${lineupMode === 'manual' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-                >
-                  Manuell
-                </Link>
-              </div>
-              {['booking', 'draft'].includes(show.status) && (requirements ?? []).length > 0 && (
-                <ToastActionForm
-                  action={sendFallbackOffersAction}
-                  successMessage="Fallback-tilbud sendes i bakgrunnen."
-                >
-                  <input type="hidden" name="show_id" value={show.id} />
-                  <button
-                    type="submit"
-                    className="shrink-0 px-3 py-1.5 rounded-md border text-sm font-medium hover:bg-muted transition-colors whitespace-nowrap"
-                  >
-                    Send fallback-tilbud
-                  </button>
-                </ToastActionForm>
-              )}
-            </div>
-
-            {/* Per-requirement cards — lineup + tilbud integrert */}
-            {(requirements ?? []).map(req => {
-              const fill = reqFillStatus.find(r => r.id === req.id)!
-              const confirmedSpots = (lineup ?? []).filter(
-                s => s.show_requirement_id === req.id && ['confirmed', 'completed', 'paid'].includes(s.status)
-              )
-              const pendingOffers = (offers ?? []).filter(
-                o => o.show_requirement_id === req.id && o.status === 'sent'
-              )
-              const declinedOffers = (offers ?? []).filter(
-                o => o.show_requirement_id === req.id && ['declined', 'expired', 'filled_by_other', 'cancelled'].includes(o.status)
-              )
-              const hasRows = confirmedSpots.length > 0 || pendingOffers.length > 0
-
-              return (
-                <div key={req.id} className="rounded-xl border bg-card overflow-hidden">
-                  {/* Requirement header */}
-                  <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/20">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <span className="font-semibold text-sm">{req.role_name}</span>
-                      <div className="flex gap-1">
-                        {Array.from({ length: req.quantity }).map((_, i) => (
-                          <div
-                            key={i}
-                            className={`size-3.5 rounded-sm ${
-                              i < fill.filled
-                                ? 'bg-emerald-500'
-                                : i < fill.filled + fill.pendingOffers
-                                ? 'bg-amber-400'
-                                : 'bg-muted-foreground/20'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${fill.isFull ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                        {fill.isFull ? '✓ Fylt' : `${fill.filled}/${req.quantity}`}
-                      </span>
-                      {pendingOffers.length > 0 && (
-                        <span className="text-xs text-amber-600 font-medium">
-                          {pendingOffers.length} venter svar
-                        </span>
-                      )}
-                    </div>
-                    {declinedOffers.length > 0 && (
-                      <span className="text-xs text-muted-foreground shrink-0">
-                        {declinedOffers.length} avslått
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Rows */}
-                  {hasRows && (
-                    <div className="divide-y">
-                      {confirmedSpots.map(spot => {
-                        const artist = artistMap[spot.artist_id]
-                        return (
-                          <div key={spot.id} className="flex items-center gap-3 px-4 py-3 border-l-2 border-l-emerald-500 bg-emerald-50/20 dark:bg-emerald-950/10">
-                            {artist?.profile_image_url ? (
-                              <Image
-                                src={artist.profile_image_url}
-                                alt=""
-                                width={36}
-                                height={36}
-                                unoptimized={shouldBypassImageOptimization(artist.profile_image_url)}
-                                className="size-9 rounded-full object-cover shrink-0"
-                              />
-                            ) : (
-                              <div className="size-9 rounded-full bg-emerald-100 dark:bg-emerald-900 flex items-center justify-center text-sm font-bold text-emerald-700 dark:text-emerald-300 shrink-0">
-                                {(artist?.full_name ?? '?').charAt(0)}
-                              </div>
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <Link
-                                  href={`/admin-app/artists/${spot.artist_id}`}
-                                  className="font-semibold text-sm truncate hover:underline underline-offset-2"
-                                >
-                                  {artist?.full_name ?? '—'}
-                                </Link>
-                                {artist?.admin_score != null && (
-                                  <span className="text-xs text-muted-foreground shrink-0">⭐ {artist.admin_score}</span>
-                                )}
-                              </div>
-                              <div className="text-xs text-muted-foreground truncate">{artist?.email}</div>
-                            </div>
-                            <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[spot.status] ?? ''}`}>
-                              {spot.status}
-                            </span>
-                            <span className="shrink-0 text-xs text-muted-foreground tabular-nums min-w-[60px] text-right">
-                              {spot.fee_amount ? `${spot.fee_amount / 100} ${spot.currency ?? show.currency}` : '—'}
-                            </span>
-                            {lineupMode === 'manual' ? (
-                              <ToastActionForm action={removeSpotAction}>
-                                <input type="hidden" name="spot_id" value={spot.id} />
-                                <input type="hidden" name="show_id" value={show.id} />
-                                <button
-                                  type="submit"
-                                  className="shrink-0 rounded border px-2 py-1 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10"
-                                >
-                                  Fjern
-                                </button>
-                              </ToastActionForm>
-                            ) : (
-                              <div className="w-[46px] shrink-0" />
-                            )}
-                          </div>
-                        )
-                      })}
-
-                      {pendingOffers.map(o => {
-                        const artist = artistMap[o.artist_id]
-                        return (
-                          <div key={o.id} className="flex items-center gap-3 px-4 py-2.5 border-l-2 border-l-amber-400 bg-amber-50/30 dark:bg-amber-950/10">
-                            {artist?.profile_image_url ? (
-                              <Image
-                                src={artist.profile_image_url}
-                                alt=""
-                                width={36}
-                                height={36}
-                                unoptimized={shouldBypassImageOptimization(artist.profile_image_url)}
-                                className="size-9 rounded-full object-cover shrink-0 opacity-70"
-                              />
-                            ) : (
-                              <div className="size-9 rounded-full bg-amber-100 dark:bg-amber-900 flex items-center justify-center text-sm font-bold text-amber-600 dark:text-amber-300 shrink-0">
-                                {(artist?.full_name ?? '?').charAt(0)}
-                              </div>
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <Link
-                                  href={`/admin-app/artists/${o.artist_id}`}
-                                  className="text-sm truncate text-muted-foreground hover:underline underline-offset-2"
-                                >
-                                  {artist?.full_name ?? '—'}
-                                </Link>
-                                {artist?.admin_score != null && (
-                                  <span className="text-xs text-muted-foreground/60 shrink-0">⭐ {artist.admin_score}</span>
-                                )}
-                              </div>
-                              <div className="text-xs text-muted-foreground/60 truncate">{artist?.email}</div>
-                            </div>
-                            <span className="shrink-0 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
-                              Venter svar
-                            </span>
-                            <span className="shrink-0 text-xs text-muted-foreground tabular-nums min-w-[60px] text-right">
-                              {o.sent_at ? new Date(o.sent_at).toLocaleDateString('nb-NO') : '—'}
-                            </span>
-                            <div className="w-[46px] shrink-0" />
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-
-                  {!hasRows && (
-                    <p className="px-4 py-5 text-sm text-muted-foreground">
-                      {show.status === 'draft'
-                        ? 'Start booking for å sende tilbud til artister.'
-                        : 'Ingen aktive tilbud eller bekreftede artister ennå.'}
-                    </p>
-                  )}
-
-                  {/* Manual add form — per requirement, only if mode=manual and slots open */}
-                  {lineupMode === 'manual' && fill.filled < req.quantity && manualSelectableArtists.length > 0 && (
-                    <div className="border-t bg-muted/10 px-4 py-4">
-                      <p className="text-xs font-medium text-muted-foreground mb-3">Legg til artist manuelt</p>
-                      <ManualSpotForm
-                        showId={show.id}
-                        currency={show.currency}
-                        artists={manualSelectableArtists}
-                        requirements={[{ id: req.id, role_name: req.role_name, quantity: req.quantity, filled: fill.filled }]}
-                      />
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-
-            {/* Unassigned offers */}
-            {(() => {
-              const unassigned = (offers ?? []).filter(o => !o.show_requirement_id)
-              if (!unassigned.length) return null
-              return (
-                <div className="rounded-xl border bg-card overflow-hidden">
-                  <div className="px-4 py-3 border-b bg-muted/20 flex items-center gap-2">
-                    <span className="font-semibold text-sm">Øvrige tilbud</span>
-                    <span className="text-xs text-muted-foreground">Ikke tilknyttet krav</span>
-                  </div>
-                  <div className="divide-y">
-                    {unassigned.map(o => {
-                      const artist = artistMap[o.artist_id]
-                      return (
-                        <div key={o.id} className="flex items-center gap-3 px-4 py-3">
-                          <div className="flex-1 text-sm font-medium">{artist?.full_name ?? '—'}</div>
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[o.status] ?? 'bg-muted text-muted-foreground'}`}>
-                            {o.status.replaceAll('_', ' ')}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {o.sent_at ? new Date(o.sent_at).toLocaleDateString('nb-NO') : '—'}
-                          </span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )
-            })()}
-
-            {/* Empty state */}
-            {(requirements ?? []).length === 0 && (
-              <div className="rounded-xl border border-dashed p-12 text-center text-muted-foreground text-sm">
-                Ingen krav definert ennå.
-                <div className="mt-3">
-                  <Link
-                    href={`/admin-app/shows/${id}?tab=requirements`}
-                    className="text-primary underline-offset-2 hover:underline text-sm"
-                  >
-                    Sett opp bookingkrav
-                  </Link>
-                </div>
-              </div>
-            )}
-
-            {/* All-filled celebration */}
-            {allSlotsFilled && show.status === 'booking' && (
-              <div className="rounded-xl border-2 border-purple-300 bg-purple-50/50 dark:bg-purple-950/20 p-5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div>
-                    <h3 className="font-bold text-purple-900 dark:text-purple-300">Lineup er klar! 🎉</h3>
-                    <p className="text-sm text-purple-700 dark:text-purple-400 mt-0.5">
-                      Alle plasser er fylt. Systemet genererer lineup-plakat, publiserer eventside og starter markedsføring automatisk.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          <LineupTab
+            showId={show.id}
+            showStatus={show.status}
+            showCurrency={show.currency}
+            requirements={(requirements ?? []).map(r => ({
+              id: r.id,
+              role_name: r.role_name,
+              quantity: r.quantity,
+              lineup_position: r.lineup_position,
+            }))}
+            confirmedSpots={(lineup ?? []).map(s => ({
+              id: s.id,
+              artist_id: s.artist_id,
+              show_requirement_id: s.show_requirement_id,
+              status: s.status,
+              fee_amount: s.fee_amount ?? null,
+              currency: s.currency ?? null,
+            }))}
+            allOffers={(offers ?? []).map(o => ({
+              id: o.id,
+              artist_id: o.artist_id,
+              show_requirement_id: o.show_requirement_id ?? null,
+              status: o.status,
+              sent_at: o.sent_at ?? null,
+            }))}
+            artistMap={artistMap as Record<string, { id: string; full_name: string; stage_name: string | null; email: string; profile_image_url: string | null; admin_score: number | null; admin_energy_level: string | null }>}
+            selectableArtists={(selectableArtists ?? []).filter(a => !activeArtistIds.has(a.id))}
+            allSlotsFilled={allSlotsFilled}
+          />
         )}
 
         {/* ══════════════════ MARKETING ══════════════════ */}
@@ -799,7 +403,7 @@ export default async function ShowDetailPage({
                 </div>
                 {show.poster_url ? (
                   <div className="space-y-2">
-                    <div className="relative h-80 w-full overflow-hidden rounded-lg border bg-muted/20">
+                    <div className="relative aspect-[3/4] w-full overflow-hidden rounded-lg border bg-muted/20">
                       <Image src={show.poster_url} alt={`Plakat for ${show.title}`} fill sizes="(max-width: 1024px) 92vw, 45vw" className="object-contain" />
                     </div>
                     <a href={show.poster_url} target="_blank" rel="noreferrer" className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline block">
@@ -807,7 +411,7 @@ export default async function ShowDetailPage({
                     </a>
                   </div>
                 ) : (
-                  <div className="rounded-lg border border-dashed bg-muted/30 h-48 flex items-center justify-center text-sm text-muted-foreground">
+                  <div className="flex aspect-[3/4] items-center justify-center rounded-lg border border-dashed bg-muted/30 text-sm text-muted-foreground">
                     {show.status === 'draft' ? 'Plakat genereres når lineup er bekreftet.' : 'Ingen plakat generert ennå.'}
                   </div>
                 )}
@@ -901,40 +505,6 @@ export default async function ShowDetailPage({
           </div>
           </>
         )}
-      </div>
-    </div>
-  )
-}
-
-function ShowChipGroup({
-  label,
-  name,
-  current,
-  chips,
-}: {
-  label: string
-  name: string
-  current: string
-  chips: { value: string; label: string }[]
-}) {
-  return (
-    <div className="space-y-2">
-      <p className="text-xs font-medium text-muted-foreground">{label}</p>
-      <div className="flex flex-wrap gap-1.5">
-        {chips.map((chip) => (
-          <label key={chip.value} className="cursor-pointer">
-            <input
-              type="radio"
-              name={name}
-              value={chip.value}
-              defaultChecked={current === chip.value}
-              className="sr-only peer"
-            />
-            <span className="inline-flex items-center px-3 py-1 rounded-full border text-xs font-medium transition-colors select-none peer-checked:bg-primary peer-checked:text-primary-foreground peer-checked:border-primary hover:bg-muted">
-              {chip.label}
-            </span>
-          </label>
-        ))}
       </div>
     </div>
   )

@@ -4,8 +4,8 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { registerArtist } from '@/lib/actions/artist'
-import { runArtistAiAssessment } from '@/lib/actions/ai'
 import { sendArtistRegisteredEmail } from '@/lib/email/mailer'
+import { canonicalRoleValues } from '@/lib/artist-roles'
 
 export async function createArtistAction(formData: FormData) {
   const email = (formData.get('email') as string).trim()
@@ -14,9 +14,8 @@ export async function createArtistAction(formData: FormData) {
   const stage_name = (formData.get('stage_name') as string).trim() || undefined
   const phone = (formData.get('phone') as string).trim() || undefined
   const bio = (formData.get('bio') as string).trim() || undefined
-  const category = (formData.get('category') as string).trim() || undefined
+  const category = canonicalRoleValues(formData.getAll('category').map((value) => String(value)))
   const language = (formData.get('language') as string).trim() || undefined
-  const consent_ai_research = formData.get('consent_ai_research') === 'true'
 
   if (!email || !full_name) throw new Error('E-post og navn er påkrevd')
 
@@ -37,26 +36,15 @@ export async function createArtistAction(formData: FormData) {
       email,
       phone: phone ?? null,
       bio: bio ?? null,
-      category: category ?? null,
+      category: category.length > 0 ? category : null,
       language: language ?? null,
-      consent_ai_research,
       status: 'pending_review',
     }).select('id').single()
 
     if (artistError || !artist) throw new Error(artistError?.message ?? 'Kunne ikke opprette artist')
     artistId = artist.id
 
-    // Ensure there's an AI assessment row
-    await admin.from('artist_ai_assessments').upsert({
-      artist_id: artistId,
-      ai_status: 'pending',
-    }, { onConflict: 'artist_id', ignoreDuplicates: true })
-
     await sendArtistRegisteredEmail({ email, full_name })
-
-    if (consent_ai_research) {
-      runArtistAiAssessment(artistId).catch(console.error)
-    }
   } else {
     if (!password) throw new Error('Passord er påkrevd for ny bruker')
     const result = await registerArtist({
@@ -68,7 +56,6 @@ export async function createArtistAction(formData: FormData) {
       bio,
       category,
       language,
-      consent_ai_research,
     })
     artistId = result.artistId
   }

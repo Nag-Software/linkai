@@ -16,7 +16,6 @@ alter table orders enable row level security;
 alter table tickets enable row level security;
 alter table artist_payouts enable row level security;
 alter table artist_invoices enable row level security;
-alter table tracking_events enable row level security;
 alter table email_logs enable row level security;
 alter table marketing_tasks enable row level security;
 
@@ -185,12 +184,8 @@ create policy "Admins manage invoices"
   using (is_admin());
 
 -- ─────────────────────────────────────────────────────────────
--- tracking_events / email_logs / marketing_tasks — admin only
+-- email_logs / marketing_tasks — admin only
 -- ─────────────────────────────────────────────────────────────
-create policy "Admins manage tracking events"
-  on tracking_events for all
-  using (is_admin());
-
 create policy "Admins manage email logs"
   on email_logs for all
   using (is_admin());

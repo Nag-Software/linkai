@@ -12,6 +12,7 @@ import {
   FieldSeparator,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { ARTIST_ROLE_OPTIONS } from "@/lib/artist-roles"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { LayoutBottomIcon } from "@hugeicons/core-free-icons"
 
@@ -103,14 +104,23 @@ export function SignupForm({
           </Field>
           <Field>
             <FieldLabel htmlFor="category">Kategori</FieldLabel>
-            <select id="category" name="category" defaultValue="Standup" className="h-9 w-full rounded-4xl border border-input bg-input/30 px-3 py-1 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50">
-              <option>Standup</option>
-              <option>Impro</option>
-              <option>Musikk</option>
-              <option>Revy</option>
-              <option>Sketsj</option>
-              <option>Annet</option>
-            </select>
+            <div className="flex flex-wrap gap-2">
+              {ARTIST_ROLE_OPTIONS.map((role) => (
+                <label key={role.value} className="cursor-pointer">
+                  <input
+                    id={role.value === 'headliner' ? 'category' : undefined}
+                    type="checkbox"
+                    name="category"
+                    value={role.value}
+                    defaultChecked={role.value === 'stand-up'}
+                    className="sr-only peer"
+                  />
+                  <span className="inline-flex items-center rounded-full border border-input bg-input/30 px-3 py-1 text-sm transition-colors peer-checked:border-primary peer-checked:bg-primary peer-checked:text-primary-foreground hover:bg-muted">
+                    {role.label}
+                  </span>
+                </label>
+              ))}
+            </div>
           </Field>
           <Field>
             <FieldLabel htmlFor="bio">Kort bio</FieldLabel>
@@ -144,17 +154,6 @@ export function SignupForm({
               <FieldLabel htmlFor="website">Nettside</FieldLabel>
               <Input id="website" name="website" type="url" placeholder="https://" />
             </div>
-          </Field>
-          <Field>
-            <label className="flex items-start gap-3 text-sm text-muted-foreground">
-              <input
-                name="consent_ai_research"
-                type="checkbox"
-                value="true"
-                className="mt-1 size-4 rounded border border-input"
-              />
-              Jeg samtykker til at systemet kan bruke offentlig tilgjengelig informasjon, sammen med informasjonen jeg selv oppgir, til å lage en intern og veiledende vurdering av profilen min. Vurderingen brukes kun som beslutningsstøtte for booking og godkjenning.
-            </label>
           </Field>
           <Field>
             <Button type="submit">Registrer artistprofil</Button>

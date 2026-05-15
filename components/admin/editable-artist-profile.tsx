@@ -4,10 +4,11 @@ import { useState, useTransition, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import { Input } from '@/components/ui/input'
 import { updateArtistProfile } from '@/app/admin-app/artists/[id]/actions'
+import { ARTIST_ROLE_OPTIONS, formatArtistRoleSummary, normalizeArtistRoleList } from '@/lib/artist-roles'
 import { shouldBypassImageOptimization } from '@/lib/utils'
 import type { Artist } from '@/types/database'
 
-type EditableField = 'full_name' | 'stage_name' | 'email' | 'phone' | 'category' | 'language' | 'bio' | 'consent_ai_research' | 'social_links' | 'gender'
+type EditableField = 'full_name' | 'stage_name' | 'email' | 'phone' | 'category' | 'language' | 'bio' | 'social_links'
 
 type SocialEntry = { key: string; url: string }
 
@@ -26,12 +27,10 @@ export function EditableArtistProfile({ artist }: { artist: Artist }) {
     stage_name: artist.stage_name ?? '',
     email: artist.email,
     phone: artist.phone ?? '',
-    category: artist.category ?? '',
+    category: normalizeArtistRoleList(artist.category),
     language: artist.language ?? '',
     bio: artist.bio ?? '',
-    consent_ai_research: artist.consent_ai_research,
     social_links: socialLinksToEntries(artist.social_links),
-    gender: artist.gender ?? '',
   })
   const [editing, setEditing] = useState<EditableField | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -45,8 +44,11 @@ export function EditableArtistProfile({ artist }: { artist: Artist }) {
     fd.set('artist_id', artist.id)
     if (field === 'social_links') {
       fd.set('social_links', JSON.stringify(entriesToSocialLinks(value as SocialEntry[])))
-    } else if (field === 'consent_ai_research') {
-      fd.set('consent_ai_research', value ? 'true' : 'false')
+    } else if (field === 'category') {
+      fd.set('category_present', '1')
+      for (const category of value as string[]) {
+        fd.append('category', category)
+      }
     } else {
       fd.set(field, value as string)
     }
@@ -66,7 +68,7 @@ export function EditableArtistProfile({ artist }: { artist: Artist }) {
         const newValue = values[field]
         
         // Deep comparison for social_links
-        if (field === 'social_links') {
+        if (field === 'social_links' || field === 'category') {
           if (JSON.stringify(oldValue) !== JSON.stringify(newValue)) {
             fieldsToSave.push(field)
           }
@@ -193,16 +195,36 @@ export function EditableArtistProfile({ artist }: { artist: Artist }) {
           <EditableFieldRow
             label="Kategori"
             isEditing={editing === 'category'}
-            display={<span className={cellClass} onClick={() => setEditing('category')}>{values.category || <em className="text-muted-foreground not-italic">—</em>}</span>}
+            display={<span className={cellClass} onClick={() => setEditing('category')}>{formatArtistRoleSummary(values.category, '') || <em className="text-muted-foreground not-italic">—</em>}</span>}
             input={
-              <Input
-                autoFocus
-                value={values.category}
-                onChange={e => setValues(v => ({ ...v, category: e.target.value }))}
-                onBlur={() => setEditing(null)}
-                onKeyDown={e => handleKeyDown(e, 'category')}
-                className="h-7 text-sm"
-              />
+              <div className="space-y-2 rounded-md border border-input bg-background p-2">
+                <div className="flex flex-wrap gap-2">
+                  {ARTIST_ROLE_OPTIONS.map((role) => {
+                    const checked = values.category.includes(role.value)
+                    return (
+                      <label key={role.value} className="cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => setValues((current) => ({
+                            ...current,
+                            category: checked
+                              ? current.category.filter((value) => value !== role.value)
+                              : [...current.category, role.value],
+                          }))}
+                          className="sr-only peer"
+                        />
+                        <span className="inline-flex items-center rounded-full border px-3 py-1 text-xs transition-colors peer-checked:border-primary peer-checked:bg-primary peer-checked:text-primary-foreground hover:bg-muted">
+                          {role.label}
+                        </span>
+                      </label>
+                    )
+                  })}
+                </div>
+                <button type="button" onClick={() => setEditing(null)} className="text-xs text-muted-foreground hover:text-foreground">
+                  Ferdig
+                </button>
+              </div>
             }
           />
 
@@ -223,60 +245,6 @@ export function EditableArtistProfile({ artist }: { artist: Artist }) {
             }
           />
 
-          {/* Kjønn */}
-          <EditableFieldRow
-            label="Kjønn"
-            isEditing={editing === 'gender'}
-            display={
-              <span className={cellClass} onClick={() => setEditing('gender')}>
-                {values.gender === 'male' ? 'Mann' : values.gender === 'female' ? 'Dame' : values.gender === 'other' ? 'Annet' : <em className="text-muted-foreground not-italic">—</em>}
-              </span>
-            }
-            input={
-              <select
-                autoFocus
-                value={values.gender}
-                onChange={e => {
-                  setValues(v => ({ ...v, gender: e.target.value }))
-                  setEditing(null)
-                }}
-                onBlur={() => setEditing(null)}
-                className="w-full border border-input rounded-md px-2 py-1 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring h-7"
-              >
-                <option value="">Ikke oppgitt</option>
-                <option value="male">Mann</option>
-                <option value="female">Dame</option>
-                <option value="other">Annet</option>
-              </select>
-            }
-          />
-
-          {/* AI-samtykke */}
-          <EditableFieldRow
-            label="AI-samtykke"
-            isEditing={editing === 'consent_ai_research'}
-            display={
-              <span className={cellClass} onClick={() => setEditing('consent_ai_research')}>
-                {values.consent_ai_research ? 'Ja' : 'Nei'}
-              </span>
-            }
-            input={
-              <select
-                autoFocus
-                value={values.consent_ai_research ? 'true' : 'false'}
-                onChange={e => {
-                  const val = e.target.value === 'true'
-                  setValues(v => ({ ...v, consent_ai_research: val }))
-                  setEditing(null)
-                }}
-                onBlur={() => setEditing(null)}
-                className="w-full border border-input rounded-md px-2 py-1 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring h-7"
-              >
-                <option value="false">Nei</option>
-                <option value="true">Ja</option>
-              </select>
-            }
-          />
         </div>
       </div>
 

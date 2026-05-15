@@ -19,19 +19,13 @@ const integrations = [
   {
     group: 'AI',
     items: [
-      { name: 'OpenAI API Key', key: 'OPENAI_API_KEY', envVar: process.env.OPENAI_API_KEY, desc: 'AI-vurdering og plakatgenerering' },
+      { name: 'OpenAI API Key', key: 'OPENAI_API_KEY', envVar: process.env.OPENAI_API_KEY, desc: 'Plakatgenerering' },
     ],
   },
   {
     group: 'E-post',
     items: [
       { name: 'Resend API Key', key: 'RESEND_API_KEY', envVar: process.env.RESEND_API_KEY, desc: 'E-postleverandør' },
-    ],
-  },
-  {
-    group: 'Tracking',
-    items: [
-      { name: 'Stape Server URL', key: 'STAPE_SERVER_URL', envVar: process.env.STAPE_SERVER_URL, desc: 'Stape GTM server-side' },
     ],
   },
 ]

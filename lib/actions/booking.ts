@@ -6,9 +6,10 @@ import {
   sendBookingOfferEmail,
   sendBookingConfirmedEmail,
   sendSpotFilledEmail,
+  sendSpotAvailableEmail,
 } from '@/lib/email/mailer'
 import { generateShowPoster } from '@/lib/actions/ai'
-import type { MarketingTaskKey } from '@/types/database'
+import { artistMatchesRole } from '@/lib/artist-roles'
 
 const MIN_BOOKABLE_SCORE = 6
 const ACTIVE_BOOKING_STATUSES = ['draft', 'booking'] as const
@@ -17,58 +18,7 @@ function publicAppUrl() {
   return (process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000').replace(/\/$/, '')
 }
 
-function formatShowDateTime(show: { date: string; start_time?: string | null }) {
-  return `${show.date}${show.start_time ? ` kl. ${show.start_time.slice(0, 5)}` : ''}`
-}
 
-async function postShowToFacebook(opts: {
-  title: string
-  slug: string
-  date: string
-  start_time?: string | null
-  venue_name?: string | null
-  poster_url?: string | null
-  artist_names: string[]
-}) {
-  const pageId = process.env.FACEBOOK_PAGE_ID
-  const accessToken = process.env.FACEBOOK_PAGE_ACCESS_TOKEN
-  if (!pageId || !accessToken) return { posted: false, reason: 'missing_credentials' as const }
-
-  const eventUrl = `${publicAppUrl()}/events/${opts.slug}`
-  const message = [
-    opts.title,
-    '',
-    formatShowDateTime(opts),
-    opts.venue_name ? `Sted: ${opts.venue_name}` : null,
-    opts.artist_names.length > 0 ? `Lineup: ${opts.artist_names.join(', ')}` : null,
-    '',
-    `Billetter: ${eventUrl}`,
-  ].filter(Boolean).join('\n')
-
-  const params = new URLSearchParams({ access_token: accessToken })
-  let endpoint = `https://graph.facebook.com/v20.0/${pageId}/feed`
-
-  if (opts.poster_url) {
-    endpoint = `https://graph.facebook.com/v20.0/${pageId}/photos`
-    params.set('url', opts.poster_url)
-    params.set('caption', message)
-  } else {
-    params.set('message', message)
-    params.set('link', eventUrl)
-  }
-
-  try {
-    const response = await fetch(endpoint, { method: 'POST', body: params })
-    if (!response.ok) {
-      console.error('[BookingAutomation] Facebook post failed:', response.status, await response.text())
-      return { posted: false, reason: 'request_failed' as const }
-    }
-    return { posted: true as const }
-  } catch (error) {
-    console.error('[BookingAutomation] Facebook post failed:', error)
-    return { posted: false, reason: 'request_failed' as const }
-  }
-}
 
 /**
  * 6.5 Book show
@@ -130,10 +80,11 @@ export async function bookShow(showId: string) {
   // Load all approved, non-flagged artists once
   const { data: allArtists } = await admin
     .from('artists')
-    .select('id, email, full_name, admin_score, admin_energy_level, admin_tags, gender')
+    .select('id, email, full_name, admin_score, admin_energy_level, gender, admin_type, category')
     .eq('status', 'approved')
     .eq('is_flagged', false)
-  if (!allArtists?.length) return { offersCreated, candidatesMatched }
+
+  if (!allArtists) return { sent: 0 }
 
   // Artists already involved in this show
   const [{ data: existingOffers }, { data: existingSpots }] = await Promise.all([
@@ -145,7 +96,16 @@ export async function bookShow(showId: string) {
     ...(existingSpots ?? []).map(s => s.artist_id),
   ])
 
-  type Artist = { id: string; email: string; full_name: string; admin_score: number | null; admin_energy_level: string | null; admin_tags: string[] | null; gender: string | null }
+  type Artist = {
+    id: string
+    email: string
+    full_name: string
+    admin_score: number | null
+    admin_energy_level: string | null
+    gender: string | null
+    admin_type: string[] | null
+    category: string[] | null
+  }
   const today = new Date().toISOString().slice(0, 10)
   function recencyBonus(artistId: string): number {
     const lastDate = lastBookedMap.get(artistId)
@@ -153,8 +113,8 @@ export async function bookShow(showId: string) {
     const days = Math.max(0, Math.floor((new Date(today).getTime() - new Date(lastDate).getTime()) / 86400000))
     return Math.min(days, 90) / 90 * 50
   }
-  function rankScore(a: Artist) {
-    return (availableSet.has(a.id) ? 1000 : 0) + (a.admin_score ?? 0) + recencyBonus(a.id)
+  function rankScore(a: Artist, roleName: string) {
+    return (availableSet.has(a.id) ? 1000 : 0) + (a.admin_score ?? 0) + recencyBonus(a.id) + (artistMatchesRole(roleName, a) ? 25 : 0)
   }
 
   // Build strict candidate lists per requirement
@@ -178,13 +138,9 @@ export async function bookShow(showId: string) {
         if ((a.admin_score ?? 0) < minScore) return false
         if (req.energy_level !== 'any' && a.admin_energy_level !== req.energy_level) return false
         if (req.required_gender && req.required_gender !== 'any' && a.gender !== req.required_gender) return false
-        if (req.required_tags?.length) {
-          const tags: string[] = a.admin_tags ?? []
-          if (!req.required_tags.some(t => tags.includes(t))) return false
-        }
         return true
       })
-      .sort((a, b) => rankScore(b) - rankScore(a))
+      .sort((a, b) => rankScore(b, req.role_name) - rankScore(a, req.role_name))
 
     groups.push({ req, slotsNeeded, strictCandidates })
   }
@@ -271,9 +227,9 @@ export async function sendFallbackOffersForShow(showId: string) {
 
   const { data: allArtists } = await admin
     .from('artists')
-    .select('id, email, full_name, admin_score, admin_energy_level, admin_tags, gender')
-    .eq('status', 'approved')
-    .eq('is_flagged', false)
+    .select('id, email, full_name, admin_score, admin_energy_level, gender, admin_type, category')
+        .eq('status', 'approved')
+        .eq('is_flagged', false)
   if (!allArtists?.length) return { offersCreated }
 
   const [{ data: existingOffers }, { data: existingSpots }] = await Promise.all([
@@ -303,7 +259,16 @@ export async function sendFallbackOffersForShow(showId: string) {
     if (!existing || d > existing) fbLastBookedMap.set(row.artist_id, d)
   }
 
-  type Artist = { id: string; email: string; full_name: string; admin_score: number | null; admin_energy_level: string | null; admin_tags: string[] | null; gender: string | null }
+  type Artist = {
+    id: string
+    email: string
+    full_name: string
+    admin_score: number | null
+    admin_energy_level: string | null
+    gender: string | null
+    admin_type: string[] | null
+    category: string[] | null
+  }
   const todayFb = new Date().toISOString().slice(0, 10)
   function recencyBonusFb(artistId: string): number {
     const lastDate = fbLastBookedMap.get(artistId)
@@ -311,8 +276,8 @@ export async function sendFallbackOffersForShow(showId: string) {
     const days = Math.max(0, Math.floor((new Date(todayFb).getTime() - new Date(lastDate).getTime()) / 86400000))
     return Math.min(days, 90) / 90 * 50
   }
-  function rankScore(a: Artist) {
-    return (availableSet.has(a.id) ? 1000 : 0) + (a.admin_score ?? 0) + recencyBonusFb(a.id)
+  function rankScore(a: Artist, roleName: string) {
+    return (availableSet.has(a.id) ? 1000 : 0) + (a.admin_score ?? 0) + recencyBonusFb(a.id) + (artistMatchesRole(roleName, a) ? 25 : 0)
   }
 
   // Build fallback groups for requirements still needing artists
@@ -338,11 +303,9 @@ export async function sendFallbackOffersForShow(showId: string) {
         // Passes if it FAILS at least one strict criterion
         const failsScore = (a.admin_score ?? 0) < minScore
         const failsEnergy = req.energy_level !== 'any' && a.admin_energy_level !== req.energy_level
-        const failsTags = (req.required_tags?.length ?? 0) > 0 &&
-          !req.required_tags!.some(t => (a.admin_tags ?? []).includes(t))
-        return failsScore || failsEnergy || failsTags
+        return failsScore || failsEnergy
       })
-      .sort((a, b) => rankScore(b) - rankScore(a))
+      .sort((a, b) => rankScore(b, req.role_name) - rankScore(a, req.role_name))
 
     if (fallbackCandidates.length > 0) {
       groups.push({ req, slotsNeeded, fallbackCandidates })
@@ -465,7 +428,6 @@ export async function automateFullbookedShow(showId: string) {
   const artistById = new Map((artistRows ?? []).map((artist) => [artist.id, artist]))
   const requirementById = new Map((requirements ?? []).map((requirement) => [requirement.id, requirement.role_name]))
 
-  const artistNames = (artistRows ?? []).map((artist) => artist.stage_name ?? artist.full_name)
   let posterUrl = show.poster_url ?? null
 
   if (!posterUrl) {
@@ -486,38 +448,8 @@ export async function automateFullbookedShow(showId: string) {
     })
   }
 
-  const { data: existingTasks } = await admin
-    .from('marketing_tasks')
-    .select('task_key, is_completed')
-    .eq('show_id', showId)
-
-  const alreadyPostedToFacebook = (existingTasks ?? []).some((task) => task.task_key === 'create_facebook_event' && task.is_completed)
-  const facebookPost = alreadyPostedToFacebook
-    ? { posted: true as const }
-    : await postShowToFacebook({
-      title: show.title,
-      slug: show.slug,
-      date: show.date,
-      start_time: show.start_time,
-      venue_name: show.venue_name ?? show.venue_address,
-      poster_url: posterUrl,
-      artist_names: artistNames,
-    })
-
   const alreadyPublished = Boolean(show.published_at)
   const publishedAt = show.published_at ?? new Date().toISOString()
-
-  const marketingTasks: Array<{ show_id: string; task_key: MarketingTaskKey; label: string; is_completed: boolean }> = [
-    { show_id: showId, task_key: 'publish_event_page', label: 'Eventside publisert automatisk', is_completed: true },
-    { show_id: showId, task_key: 'activate_ticket_sales', label: 'Billettsalg aktivert automatisk', is_completed: true },
-    { show_id: showId, task_key: 'upload_poster', label: 'Lineup-plakat generert automatisk', is_completed: Boolean(posterUrl) },
-    { show_id: showId, task_key: 'create_facebook_event', label: facebookPost.posted ? 'Facebook-post publisert automatisk' : 'Facebook-post venter på API-oppsett', is_completed: facebookPost.posted },
-    { show_id: showId, task_key: 'share_facebook_groups', label: 'Deling i Facebook-grupper venter på gruppeintegrasjon', is_completed: false },
-    { show_id: showId, task_key: 'send_calendar_partners', label: 'Send eventinfo til digitale kalendere', is_completed: false },
-    { show_id: showId, task_key: 'schedule_email', label: 'Planlegg e-post til kundeliste 10 dager før show', is_completed: false },
-  ]
-
-  await admin.from('marketing_tasks').upsert(marketingTasks, { onConflict: 'show_id,task_key', ignoreDuplicates: false })
 
   // Publish show and set poster. Transitions from any pre-published status.
   await admin.from('shows').update({
@@ -532,7 +464,7 @@ export async function automateFullbookedShow(showId: string) {
       .eq('id', showId).eq('status', 'published')
   }
 
-  return { fullbooked: true, posterUrl, facebookPosted: facebookPost.posted, published: true, publishedAt }
+  return { fullbooked: true, posterUrl, published: true, publishedAt }
 }
 
 /**
@@ -666,17 +598,6 @@ export async function acceptBookingOfferById(offerId: string) {
     .update({ status: 'accepted', responded_at: new Date().toISOString() })
     .eq('id', offer.id)
 
-  if (offer.fee_amount !== null) {
-    await admin.from('artist_payouts').insert({
-      artist_id: offer.artist_id,
-      confirmed_spot_id: spot.id,
-      show_id: offer.show_id,
-      amount: offer.fee_amount,
-      currency: offer.currency,
-      status: 'pending',
-    })
-  }
-
   const { count: nowFilled } = await admin
     .from('confirmed_spots')
     .select('*', { count: 'exact', head: true })
@@ -786,4 +707,86 @@ export async function declineBookingOffer(token: string) {
 
   if (error) throw new Error(error.message)
   return { result: 'declined' as const }
+}
+
+/**
+ * Sends new booking offers for a specific requirement that just had its spot removed.
+ * Uses "Ledig spot" email instead of the standard booking offer email.
+ */
+export async function sendOffersForReopenedRequirement(showId: string, requirementId: string) {
+  const admin = createAdminClient()
+
+  const [{ data: show }, { data: requirement }] = await Promise.all([
+    admin.from('shows').select('id, title, date, status').eq('id', showId).single(),
+    admin.from('show_requirements').select('*').eq('id', requirementId).single(),
+  ])
+
+  if (!show || !requirement) return
+  if (!ACTIVE_BOOKING_STATUSES.includes(show.status as (typeof ACTIVE_BOOKING_STATUSES)[number])) return
+
+  // Check the slot is actually open
+  const { count: filled } = await admin
+    .from('confirmed_spots')
+    .select('*', { count: 'exact', head: true })
+    .eq('show_requirement_id', requirementId)
+    .in('status', ['confirmed', 'completed', 'paid'])
+
+  if ((filled ?? 0) >= requirement.quantity) return
+
+  // Artists already with active sent offers or confirmed spots for this show
+  const [{ data: existingOffers }, { data: existingSpots }] = await Promise.all([
+    admin.from('booking_offers').select('artist_id').eq('show_id', showId).eq('status', 'sent'),
+    admin.from('confirmed_spots').select('artist_id').eq('show_id', showId).in('status', ['confirmed', 'completed', 'paid']),
+  ])
+  const alreadyInvolved = new Set([
+    ...(existingOffers ?? []).map(o => o.artist_id),
+    ...(existingSpots ?? []).map(s => s.artist_id),
+  ])
+
+  const { data: allArtists } = await admin
+    .from('artists')
+    .select('id, email, full_name, admin_score, admin_energy_level, gender')
+    .eq('status', 'approved')
+    .eq('is_flagged', false)
+
+  if (!allArtists?.length) return
+
+  const minScore = Math.max(requirement.min_score ?? MIN_BOOKABLE_SCORE, MIN_BOOKABLE_SCORE)
+  const candidates = allArtists
+    .filter(a => {
+      if (alreadyInvolved.has(a.id)) return false
+      if ((a.admin_score ?? 0) < minScore) return false
+      if (requirement.energy_level !== 'any' && a.admin_energy_level !== requirement.energy_level) return false
+      if (requirement.required_gender && requirement.required_gender !== 'any' && a.gender !== requirement.required_gender) return false
+      return true
+    })
+    .sort((a, b) => (b.admin_score ?? 0) - (a.admin_score ?? 0))
+
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
+
+  for (const artist of candidates) {
+    const { data: offer, error } = await admin
+      .from('booking_offers')
+      .insert({
+        show_id: showId,
+        artist_id: artist.id,
+        show_requirement_id: requirementId,
+        status: 'sent',
+        sent_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      })
+      .select('token')
+      .single()
+
+    if (error || !offer) continue
+
+    await sendSpotAvailableEmail({
+      email: artist.email,
+      full_name: artist.full_name,
+      show_title: show.title,
+      show_date: show.date,
+      token: offer.token,
+      response_url: `${baseUrl}/booking-offer/${offer.token}`,
+    })
+  }
 }

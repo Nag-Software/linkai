@@ -1,5 +1,4 @@
 import { resend, FROM_EMAIL } from '@/lib/resend'
-import { createAdminClient } from '@/lib/supabase/admin'
 import QRCode from 'qrcode'
 
 type EmailResult = { success: boolean; resendId?: string; error?: string }
@@ -11,28 +10,6 @@ function escapeHtml(value: string | null | undefined) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;')
-}
-
-async function logEmail(opts: {
-  recipient_email: string
-  subject: string
-  template_name: string
-  resend_email_id?: string
-  status: 'sent' | 'failed'
-  error_message?: string
-  payload?: unknown
-}) {
-  const admin = createAdminClient()
-  await admin.from('email_logs').insert({
-    recipient_email: opts.recipient_email,
-    subject: opts.subject,
-    template_name: opts.template_name,
-    resend_email_id: opts.resend_email_id ?? null,
-    status: opts.status,
-    error_message: opts.error_message ?? null,
-    payload: opts.payload ?? null,
-    sent_at: opts.status === 'sent' ? new Date().toISOString() : null,
-  })
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -55,11 +32,9 @@ export async function sendArtistRegisteredEmail(opts: {
       `,
     })
     if (error) throw new Error(error.message)
-    await logEmail({ recipient_email: opts.email, subject, template_name: 'artist_registered', resend_email_id: data?.id, status: 'sent', payload: opts })
     return { success: true, resendId: data?.id }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    await logEmail({ recipient_email: opts.email, subject, template_name: 'artist_registered', status: 'failed', error_message: msg, payload: opts })
     return { success: false, error: msg }
   }
 }
@@ -82,17 +57,15 @@ export async function sendArtistApprovedEmail(opts: {
         <div style="font-family:Inter,Arial,sans-serif;color:#18181b;line-height:1.55">
           <h2>Gratulerer, ${opts.full_name}!</h2>
           <p>Du er nå godkjent som artist. Logg inn på artistportalen og velg opptil tre datoer du faktisk er tilgjengelig for.</p>
-          <p>Booking-teamet bruker datoene sammen med score, energinivå og tags når show matcher automatisk.</p>
+          <p>Booking-teamet bruker datoene sammen med score og energinivå når show matcher automatisk.</p>
           <p><a href="${opts.portal_url}" style="display:inline-block;background:#18181b;color:#ffffff;text-decoration:none;padding:10px 14px;border-radius:8px">Velg ledige datoer</a></p>
         </div>
       `,
     })
     if (error) throw new Error(error.message)
-    await logEmail({ recipient_email: opts.email, subject, template_name: 'artist_approved', resend_email_id: data?.id, status: 'sent', payload: opts })
     return { success: true, resendId: data?.id }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    await logEmail({ recipient_email: opts.email, subject, template_name: 'artist_approved', status: 'failed', error_message: msg, payload: opts })
     return { success: false, error: msg }
   }
 }
@@ -131,11 +104,9 @@ export async function sendBookingOfferEmail(opts: {
       `,
     })
     if (error) throw new Error(error.message)
-    await logEmail({ recipient_email: opts.email, subject, template_name: 'booking_offer', resend_email_id: data?.id, status: 'sent', payload: { ...opts, token: '[REDACTED]' } })
     return { success: true, resendId: data?.id }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    await logEmail({ recipient_email: opts.email, subject, template_name: 'booking_offer', status: 'failed', error_message: msg, payload: opts })
     return { success: false, error: msg }
   }
 }
@@ -162,11 +133,46 @@ export async function sendBookingConfirmedEmail(opts: {
       `,
     })
     if (error) throw new Error(error.message)
-    await logEmail({ recipient_email: opts.email, subject, template_name: 'booking_confirmed', resend_email_id: data?.id, status: 'sent', payload: opts })
     return { success: true, resendId: data?.id }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    await logEmail({ recipient_email: opts.email, subject, template_name: 'booking_confirmed', status: 'failed', error_message: msg, payload: opts })
+    return { success: false, error: msg }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Spot available (reopened by admin removal)
+// ─────────────────────────────────────────────────────────────
+export async function sendSpotAvailableEmail(opts: {
+  email: string
+  full_name: string
+  show_title: string
+  show_date: string
+  token: string
+  response_url: string
+}): Promise<EmailResult> {
+  const subject = `Ledig spot: ${opts.show_title}`
+  try {
+    const { data, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: opts.email,
+      subject,
+      html: `
+        <div style="font-family:Inter,Arial,sans-serif;color:#18181b;line-height:1.55">
+          <h2>Hei ${opts.full_name}!</h2>
+          <p>Vi har fått en ledig spot på <strong>${opts.show_title}</strong> den ${opts.show_date}.</p>
+          <p style="margin:22px 0">
+            <a href="${opts.response_url}?response=accept" style="display:inline-block;background:#18181b;color:#ffffff;text-decoration:none;padding:10px 14px;border-radius:8px;margin-right:8px">Ja, jeg er interessert</a>
+            <a href="${opts.response_url}?response=decline" style="display:inline-block;border:1px solid #d4d4d8;color:#18181b;text-decoration:none;padding:9px 14px;border-radius:8px">Nei, denne passer ikke</a>
+          </p>
+          <p>Tilbudet er gyldig i 7 dager. Første artist som godkjenner mens plassen er ledig får spotten.</p>
+        </div>
+      `,
+    })
+    if (error) throw new Error(error.message)
+    return { success: true, resendId: data?.id }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
     return { success: false, error: msg }
   }
 }
@@ -190,11 +196,9 @@ export async function sendSpotFilledEmail(opts: {
       `,
     })
     if (error) throw new Error(error.message)
-    await logEmail({ recipient_email: opts.email, subject, template_name: 'spot_filled', resend_email_id: data?.id, status: 'sent', payload: opts })
     return { success: true, resendId: data?.id }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    await logEmail({ recipient_email: opts.email, subject, template_name: 'spot_filled', status: 'failed', error_message: msg, payload: opts })
     return { success: false, error: msg }
   }
 }
@@ -300,11 +304,9 @@ export async function sendTicketPurchaseEmail(opts: {
       `,
     })
     if (error) throw new Error(error.message)
-    await logEmail({ recipient_email: opts.email, subject, template_name: 'ticket_purchase', resend_email_id: data?.id, status: 'sent', payload: { ...opts, ticket_code: '[REDACTED]' } })
     return { success: true, resendId: data?.id }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    await logEmail({ recipient_email: opts.email, subject, template_name: 'ticket_purchase', status: 'failed', error_message: msg, payload: opts })
     return { success: false, error: msg }
   }
 }

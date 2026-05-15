@@ -5,18 +5,14 @@ export type ArtistStatus = 'pending_review' | 'approved' | 'rejected' | 'inactiv
 export type ArtistGender = 'male' | 'female' | 'other'
 export type RequirementGender = 'male' | 'female' | 'any'
 export type EnergyLevel = 'high' | 'medium' | 'low' | 'uncertain'
-export type ArtistType = 'headliner' | 'konferansier' | 'klubbkomiker' | 'open_mic'
-export type AiStatus = 'pending' | 'completed' | 'failed'
-export type AiConfidence = 'low' | 'medium' | 'high'
+export type ArtistType = 'headliner' | 'konferansier' | 'stand-up' | 'open mic'
 export type ShowStatus = 'draft' | 'booking' | 'fullbooked' | 'published' | 'completed' | 'cancelled'
 export type RequirementEnergy = 'high' | 'low' | 'any' | 'uncertain'
+export type RequirementCompensationType = 'fixed' | 'percent'
 export type BookingOfferStatus = 'sent' | 'accepted' | 'declined' | 'expired' | 'filled_by_other' | 'cancelled'
 export type ConfirmedSpotStatus = 'confirmed' | 'cancelled' | 'completed' | 'paid'
 export type OrderStatus = 'pending' | 'paid' | 'failed' | 'refunded' | 'cancelled'
 export type TicketStatus = 'valid' | 'used' | 'refunded' | 'cancelled'
-export type PayoutStatus = 'pending' | 'approved' | 'paid' | 'cancelled'
-export type InvoiceStatus = 'draft' | 'submitted' | 'approved' | 'paid' | 'rejected'
-export type TrackingEventStatus = 'pending' | 'sent' | 'failed'
 export type EmailLogStatus = 'pending' | 'sent' | 'failed'
 export type MarketingTaskKey =
   | 'publish_event_page'
@@ -50,38 +46,18 @@ export type Artist = {
   phone: string | null
   profile_image_url: string | null
   bio: string | null
-  category: string | null
+  category: ArtistType[] | null
   language: string | null
   social_links: Record<string, string> | null
-  consent_ai_research: boolean
   gender: ArtistGender | null
   status: ArtistStatus
   admin_score: number | null
   admin_energy_level: EnergyLevel | null
   admin_type: ArtistType[] | null
-  admin_tags: string[] | null
   admin_notes: string | null
   is_flagged: boolean
   flag_reason: string | null
   flagged_at: string | null
-  created_at: string
-  updated_at: string
-}
-
-export type ArtistAiAssessment = {
-  id: string
-  artist_id: string
-  ai_score_suggestion: number | null
-  ai_energy_suggestion: EnergyLevel | null
-  ai_experience_level: string | null
-  ai_confidence: AiConfidence | null
-  ai_tags_suggestion: string[] | null
-  ai_summary: string | null
-  ai_reasoning: string | null
-  ai_uncertainties: string | null
-  ai_sources: unknown | null
-  ai_status: AiStatus
-  ai_last_checked_at: string | null
   created_at: string
   updated_at: string
 }
@@ -122,10 +98,13 @@ export type ShowRequirement = {
   show_id: string
   role_name: string
   quantity: number
+  lineup_position: number
   min_score: number | null
   energy_level: RequirementEnergy
   required_gender: RequirementGender
-  required_tags: string[] | null
+  compensation_type: RequirementCompensationType | null
+  compensation_amount: number | null
+  compensation_percent: number | null
   created_at: string
   updated_at: string
 }
@@ -200,51 +179,6 @@ export type Ticket = {
   updated_at: string
 }
 
-export type ArtistPayout = {
-  id: string
-  artist_id: string
-  confirmed_spot_id: string | null
-  show_id: string | null
-  amount: number
-  currency: string
-  status: PayoutStatus
-  payout_method: string | null
-  payout_reference: string | null
-  notes: string | null
-  created_at: string
-  updated_at: string
-  paid_at: string | null
-}
-
-export type ArtistInvoice = {
-  id: string
-  artist_id: string
-  show_id: string | null
-  confirmed_spot_id: string | null
-  invoice_number: string | null
-  amount: number | null
-  currency: string
-  status: InvoiceStatus
-  file_url: string | null
-  created_at: string
-  updated_at: string
-  submitted_at: string | null
-  approved_at: string | null
-  paid_at: string | null
-}
-
-export type TrackingEvent = {
-  id: string
-  show_id: string | null
-  event_name: string | null
-  event_id: string | null
-  event_source_url: string | null
-  payload: unknown | null
-  status: TrackingEventStatus
-  created_at: string
-  sent_at: string | null
-}
-
 export type EmailLog = {
   id: string
   recipient_email: string
@@ -300,14 +234,14 @@ export type Database = {
           phone?: string | null
           profile_image_url?: string | null
           bio?: string | null
-          category?: string | null
+          category?: ArtistType[] | null
           language?: string | null
+          gender?: ArtistGender | null
           social_links?: Record<string, string> | null
-          consent_ai_research?: boolean
+          admin_type?: ArtistType[] | null
           status?: ArtistStatus
           admin_score?: number | null
           admin_energy_level?: EnergyLevel | null
-          admin_tags?: string[] | null
           admin_notes?: string | null
           is_flagged?: boolean
           flag_reason?: string | null
@@ -316,28 +250,6 @@ export type Database = {
           updated_at?: string
         }
         Update: Partial<Artist>
-        Relationships: []
-      }
-      artist_ai_assessments: {
-        Row: ArtistAiAssessment
-        Insert: {
-          id?: string
-          artist_id: string
-          ai_score_suggestion?: number | null
-          ai_energy_suggestion?: EnergyLevel | null
-          ai_experience_level?: string | null
-          ai_confidence?: AiConfidence | null
-          ai_tags_suggestion?: string[] | null
-          ai_summary?: string | null
-          ai_reasoning?: string | null
-          ai_uncertainties?: string | null
-          ai_sources?: unknown | null
-          ai_status?: AiStatus
-          ai_last_checked_at?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: Partial<ArtistAiAssessment>
         Relationships: []
       }
       artist_availability: {
@@ -385,10 +297,13 @@ export type Database = {
           show_id: string
           role_name: string
           quantity: number
+          lineup_position?: number
           min_score?: number | null
           energy_level?: RequirementEnergy
           required_gender?: RequirementGender
-          required_tags?: string[] | null
+          compensation_type?: RequirementCompensationType | null
+          compensation_amount?: number | null
+          compensation_percent?: number | null
           created_at?: string
           updated_at?: string
         }
@@ -483,63 +398,6 @@ export type Database = {
           updated_at?: string
         }
         Update: Partial<Ticket>
-        Relationships: []
-      }
-      artist_payouts: {
-        Row: ArtistPayout
-        Insert: {
-          id?: string
-          artist_id: string
-          confirmed_spot_id?: string | null
-          show_id?: string | null
-          amount: number
-          currency?: string
-          status?: PayoutStatus
-          payout_method?: string | null
-          payout_reference?: string | null
-          notes?: string | null
-          created_at?: string
-          updated_at?: string
-          paid_at?: string | null
-        }
-        Update: Partial<ArtistPayout>
-        Relationships: []
-      }
-      artist_invoices: {
-        Row: ArtistInvoice
-        Insert: {
-          id?: string
-          artist_id: string
-          show_id?: string | null
-          confirmed_spot_id?: string | null
-          invoice_number?: string | null
-          amount?: number | null
-          currency?: string
-          status?: InvoiceStatus
-          file_url?: string | null
-          created_at?: string
-          updated_at?: string
-          submitted_at?: string | null
-          approved_at?: string | null
-          paid_at?: string | null
-        }
-        Update: Partial<ArtistInvoice>
-        Relationships: []
-      }
-      tracking_events: {
-        Row: TrackingEvent
-        Insert: {
-          id?: string
-          show_id?: string | null
-          event_name?: string | null
-          event_id?: string | null
-          event_source_url?: string | null
-          payload?: unknown | null
-          status?: TrackingEventStatus
-          created_at?: string
-          sent_at?: string | null
-        }
-        Update: Partial<TrackingEvent>
         Relationships: []
       }
       email_logs: {

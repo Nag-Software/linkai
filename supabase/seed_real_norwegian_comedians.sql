@@ -23,7 +23,6 @@ with real_artists (
   wikipedia_url,
   admin_score,
   admin_energy_level,
-  admin_tags
 ) as (
   values
     (
@@ -37,7 +36,6 @@ with real_artists (
       'https://no.wikipedia.org/wiki/Atle_Antonsen',
       9,
       'high',
-      array['standup', 'tv', 'sketsj', 'erfaren', 'headliner']
     ),
     (
       'Bård Tufte Johansen',
@@ -50,7 +48,6 @@ with real_artists (
       'https://no.wikipedia.org/wiki/B%C3%A5rd_Tufte_Johansen',
       9,
       'high',
-      array['satire', 'tv', 'sketsj', 'erfaren', 'headliner']
     ),
     (
       'Else Kåss Furuseth',
@@ -63,7 +60,6 @@ with real_artists (
       'https://no.wikipedia.org/wiki/Else_K%C3%A5ss_Furuseth',
       9,
       'high',
-      array['standup', 'personlig', 'varm', 'tv', 'headliner']
     ),
     (
       'Harald Eia',
@@ -76,7 +72,6 @@ with real_artists (
       'https://no.wikipedia.org/wiki/Harald_Eia',
       9,
       'low',
-      array['satire', 'tv', 'sketsj', 'smart', 'erfaren']
     ),
     (
       'Jon Almaas',
@@ -89,7 +84,6 @@ with real_artists (
       'https://no.wikipedia.org/wiki/Jon_Almaas',
       8,
       'low',
-      array['tv', 'deadpan', 'konferansier', 'erfaren', 'torr']
     ),
     (
       'Linn Skåber',
@@ -102,7 +96,6 @@ with real_artists (
       'https://no.wikipedia.org/wiki/Linn_Sk%C3%A5ber',
       9,
       'low',
-      array['scene', 'karakter', 'tekst', 'tv', 'erfaren']
     ),
     (
       'Lisa Tønne',
@@ -115,7 +108,6 @@ with real_artists (
       'https://no.wikipedia.org/wiki/Lisa_T%C3%B8nne',
       9,
       'high',
-      array['standup', 'karakter', 'energi', 'tv', 'headliner']
     ),
     (
       'Sigrid Bonde Tusvik',
@@ -128,7 +120,6 @@ with real_artists (
       'https://no.wikipedia.org/wiki/Sigrid_Bonde_Tusvik',
       9,
       'high',
-      array['standup', 'podkast', 'samfunn', 'personlig', 'headliner']
     ),
     (
       'Thomas Giertsen',
@@ -141,7 +132,6 @@ with real_artists (
       'https://no.wikipedia.org/wiki/Thomas_Giertsen',
       9,
       'low',
-      array['standup', 'tv', 'produsent', 'erfaren', 'headliner']
     ),
     (
       'Anne-Kat. Hærland',
@@ -154,7 +144,6 @@ with real_artists (
       'https://no.wikipedia.org/wiki/Anne-Kat._H%C3%A6rland',
       9,
       'low',
-      array['standup', 'satire', 'observasjon', 'samfunn', 'headliner']
     ),
     (
       'Are Kalvø',
@@ -167,7 +156,6 @@ with real_artists (
       'https://no.wikipedia.org/wiki/Are_Kalv%C3%B8',
       8,
       'low',
-      array['satire', 'scene', 'forfatter', 'samfunn', 'erfaren']
     ),
     (
       'Christian Mikkelsen',
@@ -180,7 +168,6 @@ with real_artists (
       'https://no.wikipedia.org/wiki/Christian_Mikkelsen',
       8,
       'high',
-      array['impro', 'karakter', 'tv', 'energi', 'support']
     ),
     (
       'Johan Golden',
@@ -193,7 +180,6 @@ with real_artists (
       'https://no.wikipedia.org/wiki/Johan_Golden',
       8,
       'high',
-      array['radio', 'tv', 'musikk', 'publikum', 'erfaren']
     ),
     (
       'Odd-Magnus Williamson',
@@ -206,7 +192,6 @@ with real_artists (
       'https://no.wikipedia.org/wiki/Odd-Magnus_Williamson',
       8,
       'high',
-      array['tv', 'scene', 'skuespill', 'energi', 'support']
     )
 ),
 inserted_artists as (
@@ -224,7 +209,6 @@ inserted_artists as (
     status,
     admin_score,
     admin_energy_level,
-    admin_tags,
     admin_notes
   )
   select
@@ -234,7 +218,7 @@ inserted_artists as (
     null,
     profile_image_url,
     bio,
-    category,
+    array[category]::text[],
     language,
     jsonb_build_object(
       'wikipedia', wikipedia_url,
@@ -244,10 +228,8 @@ inserted_artists as (
     'approved',
     admin_score,
     admin_energy_level,
-    admin_tags,
     format('Seedet ekte norsk komikerprofil. Kontaktinfo er testadresse; bilde/kilde: %s', wikipedia_url)
   from real_artists
-  returning id, full_name, stage_name, email, admin_score, admin_energy_level, admin_tags, profile_image_url
 )
 insert into artist_ai_assessments (
   artist_id,
@@ -255,7 +237,6 @@ insert into artist_ai_assessments (
   ai_energy_suggestion,
   ai_experience_level,
   ai_confidence,
-  ai_tags_suggestion,
   ai_summary,
   ai_reasoning,
   ai_uncertainties,
@@ -269,7 +250,6 @@ select
   inserted_artists.admin_energy_level,
   'professional',
   'medium',
-  inserted_artists.admin_tags,
   format('%s er en seedet, ekte norsk komikerprofil for demo og lokal testing.', coalesce(inserted_artists.stage_name, inserted_artists.full_name)),
   'Vurderingen er seedet manuelt fra offentlig profilinformasjon og brukes til demo/testing.',
   'Kontaktinfo er testdata. Sjekk alltid faktisk bookingkontakt utenfor seed-data.',
@@ -285,6 +265,6 @@ join real_artists using (email);
 commit;
 
 -- Quick check:
--- select full_name, stage_name, email, profile_image_url, admin_score, admin_energy_level, admin_tags
+-- select full_name, stage_name, email, profile_image_url, admin_score, admin_energy_level
 -- from artists
 -- order by case when lower(email) = 'casper_nag@outlook.com' then 0 else 1 end, full_name;

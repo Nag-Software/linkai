@@ -51,6 +51,13 @@ export default async function EventDetailPage({ params, searchParams }: Props) {
   const soldOut = remaining === 0
   const fillPercent = ticketFillPercent(show)
   const showLocation = show.venue_name ?? show.venue_address
+  const ticketWarning = soldOut
+    ? 'Utsolgt'
+    : fillPercent >= 80
+      ? 'Få plasser igjen'
+      : fillPercent >= 50
+        ? 'Over halvparten solgt'
+        : null
 
   return (
     <main className="min-h-svh bg-[#f3ead9] text-zinc-950">
@@ -65,35 +72,33 @@ export default async function EventDetailPage({ params, searchParams }: Props) {
           }}
         />
         <div className="relative mx-auto grid max-w-6xl gap-8 px-4 pb-10 pt-8 md:grid-cols-[360px_1fr] md:items-end md:px-6 md:pb-14 lg:px-8">
-          <div className="relative aspect-[4/5] overflow-hidden border-2 border-zinc-950 bg-zinc-200 p-2 shadow-[10px_10px_0_rgba(24,24,27,0.18)]">
+          <div className="border-2 border-zinc-950 shadow-[10px_10px_0_rgba(24,24,27,0.18)]">
+            <div className="relative aspect-[3/4] bg-zinc-200">
             {show.poster_url ? (
-              <Image src={show.poster_url} alt={show.title} fill priority sizes="(max-width: 768px) 92vw, 360px" className="object-contain p-2 grayscale-[10%]" />
+              <Image src={show.poster_url} alt={show.title} fill priority sizes="(max-width: 768px) 92vw, 360px" className="object-contain grayscale-[10%]" />
             ) : (
               <div className="flex h-full flex-col justify-between bg-[#b83224] p-6 text-white">
                 <span className="text-xs font-black uppercase tracking-widest">humor.events</span>
                 <strong className="text-5xl font-black uppercase leading-none">{show.title}</strong>
               </div>
             )}
-              <div className="absolute inset-x-2 bottom-2 border-t-2 border-zinc-950 bg-[#fbf7ec] p-3 text-zinc-950">
+            </div>
+            <div className="border-t-2 border-zinc-950 bg-[#fbf7ec] p-3 text-zinc-950">
               <div className="flex items-center justify-between text-xs font-black uppercase tracking-widest">
                 <span>{formatTicketPrice(show)}</span>
-                <span>{soldOut ? 'Utsolgt' : remaining !== null ? `${remaining} igjen` : 'Billetter'}</span>
+                <span>{ticketWarning ?? 'Billetter'}</span>
               </div>
-              <div className="mt-3 h-2 border border-zinc-950 bg-[#f3ead9]">
-                <div className="h-full bg-[#b83224]" style={{ width: `${fillPercent}%` }} />
-              </div>
+              {ticketWarning && <div className="mt-2 text-xs font-bold uppercase tracking-widest text-[#b83224]">{ticketWarning}</div>}
             </div>
           </div>
           <div className="flex flex-col justify-center py-4">
             <Button asChild variant="ghost" className="mb-5 w-fit rounded-none px-0 font-bold hover:bg-transparent hover:text-[#b83224]"><Link href="/events"><ArrowLeft className="size-4" /> Alle events</Link></Button>
-            <div className="mb-5 inline-flex w-fit border border-zinc-950 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.22em]">Event</div>
             <h1 className="text-[clamp(3rem,7vw,6.4rem)] font-black uppercase leading-[0.82] tracking-[-0.04em]">{show.title}</h1>
             <div className="mt-7 grid border-y-2 border-zinc-950 sm:grid-cols-2">
               <Info icon={<CalendarDays className="size-5" />} label="Dato" text={formatShowDate(show.date)} />
               <Info icon={<Clock className="size-5" />} label="Tid" text={formatShowTime(show)} />
               <Info icon={<MapPin className="size-5" />} text={showLocation ?? 'Sted kommer'} />
-              <Info icon={<Ticket className="size-5" />} text={`${formatTicketPrice(show)}${remaining !== null ? ` · ${remaining} billetter igjen` : ''}`} />
-              <Info icon={<Users className="size-5" />} text={`${lineup.length} artister i lineup`} />
+              <Info icon={<Ticket className="size-5" />} text={`${formatTicketPrice(show)}`} />
             </div>
             {error === 'sold-out' && <div className="mt-6 border-2 border-zinc-950 bg-[#fbf7ec] px-4 py-3 text-sm font-bold">Dette showet er utsolgt.</div>}
             {error === 'checkout' && <div className="mt-6 border-2 border-zinc-950 bg-[#fbf7ec] px-4 py-3 text-sm font-bold">Checkout kunne ikke åpnes akkurat nå.</div>}
@@ -134,15 +139,7 @@ export default async function EventDetailPage({ params, searchParams }: Props) {
         <aside className="h-fit border-2 border-zinc-950 bg-[#fbf7ec] p-5 shadow-[6px_6px_0_rgba(24,24,27,0.12)] md:sticky md:top-6">
           <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Pris</div>
           <div className="mt-1 text-4xl font-black tracking-[-0.05em]">{formatTicketPrice(show)}</div>
-          <div className="mt-5 space-y-2">
-            <div className="flex justify-between text-xs font-medium text-zinc-600">
-              <span>Kapasitet</span>
-              <span>{show.capacity ? `${show.soldTickets}/${show.capacity}` : 'Åpent'}</span>
-            </div>
-            <div className="h-2 border border-zinc-950 bg-[#f3ead9]">
-              <div className="h-full bg-[#b83224]" style={{ width: `${fillPercent}%` }} />
-            </div>
-          </div>
+          {ticketWarning && <div className="mt-4 border-2 border-zinc-950 bg-[#f3ead9] px-3 py-2 text-sm font-black uppercase tracking-widest text-[#b83224]">{ticketWarning}</div>}
           <div className="mt-5 space-y-2 border-y-2 border-zinc-950 py-4 text-sm font-medium text-zinc-700">
             <div>{formatShowDate(show.date)}</div>
             <div>{formatShowTime(show)}</div>
@@ -161,7 +158,7 @@ export default async function EventDetailPage({ params, searchParams }: Props) {
 
 function Info({ icon, text, label }: { icon: React.ReactNode; text: string; label?: string }) {
   return (
-    <div className="flex items-center gap-3 border-b-2 border-zinc-950 p-3 text-sm last:border-b-0 sm:border-r-2 sm:even:border-r-0">
+    <div className="flex items-center gap-3 border-b-2 border-zinc-950 p-3 text-sm last:border-b-0 sm:border-r-2 sm:even:border-r-0 sm:[&:nth-last-child(-n+2)]:border-b-0">
       <span className="text-zinc-500">{icon}</span>
       <span>
         {label && <span className="block text-[10px] font-bold uppercase tracking-widest text-zinc-500">{label}</span>}

@@ -46,7 +46,7 @@ export function ArtistSidebar({ user }: { user: { email: string; name: string; s
                   <User className="size-4" />
                 </div>
                 <div className="flex flex-col gap-0.5 leading-none">
-                  <span className="font-semibold">Artistportal</span>
+                  <span className="font-semibold">Komikerportal</span>
                   <span className="text-xs text-muted-foreground capitalize">{user.status.replace('_', ' ')}</span>
                 </div>
               </Link>

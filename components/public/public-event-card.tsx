@@ -16,7 +16,7 @@ export function PublicEventCard({ show, priority = false, compact = false }: { s
   return (
     <article className="group border-2 border-zinc-950 bg-[#fbf7ec] shadow-[6px_6px_0_rgba(24,24,27,0.14)] transition hover:-translate-y-0.5 hover:shadow-[4px_4px_0_rgba(24,24,27,0.22)]">
       <Link href={`/events/${show.slug}`} className="block">
-        <div className={`relative border-b-2 border-zinc-950 bg-[#111111] ${compact ? 'aspect-[16/10]' : 'aspect-[2/3]'}`}>
+        <div className="relative aspect-[3/4] border-b-2 border-zinc-950 bg-[#111111]">
           {show.poster_url ? (
             <Image src={show.poster_url} alt={show.title} fill priority={priority} sizes={compact ? '(max-width: 768px) 92vw, 31vw' : '(max-width: 768px) 92vw, (max-width: 1024px) 45vw, 31vw'} className="object-contain grayscale-[10%] transition duration-500 group-hover:grayscale-0" />
           ) : (
@@ -26,7 +26,7 @@ export function PublicEventCard({ show, priority = false, compact = false }: { s
             </div>
           )}
           <div className={`absolute left-3 top-3 border-2 border-zinc-950 bg-[#fbf7ec] px-3 py-2 text-center text-zinc-950 shadow-[3px_3px_0_rgba(24,24,27,0.2)] ${compact ? 'py-1.5' : ''}`}>
-            <div className={`font-black leading-none tracking-[-0.05em] ${compact ? 'text-xl' : 'text-2xl'}`}>{day}</div>
+            <div className={`font-black leading-none tracking-normal ${compact ? 'text-xl' : 'text-2xl'}`}>{day}</div>
             <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">{month}</div>
           </div>
         </div>
@@ -37,23 +37,21 @@ export function PublicEventCard({ show, priority = false, compact = false }: { s
             <span>{formatShowTime(show)}</span>
             <ArrowUpRight className="size-4 transition group-hover:text-[#b83224]" />
           </div>
-          <h3 className={`font-black leading-tight tracking-tight ${compact ? 'min-h-0 text-base' : 'min-h-12 text-xl'}`}>{show.title}</h3>
+          <h3 className={`font-black leading-tight tracking-normal ${compact ? 'min-h-0 text-base' : 'min-h-0 text-lg sm:min-h-12 sm:text-xl'}`}>{show.title}</h3>
           <p className={`mt-2 text-zinc-600 ${compact ? 'text-xs' : 'text-sm'}`}>
             {showLocation ?? 'Sted kommer'} · {formatTicketPrice(show)}
           </p>
         </div>
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs font-medium text-zinc-600">
-            <span>{soldOut ? 'Utsolgt' : remaining !== null ? `${remaining} igjen` : 'Billetter'}</span>
-            <span>{show.capacity ? `${show.soldTickets}/${show.capacity}` : 'Åpent'}</span>
-          </div>
-          <div className="h-2 border border-zinc-950 bg-[#f3ead9]">
-            <div className="h-full bg-[#b83224]" style={{ width: `${fillPercent}%` }} />
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
+        {soldOut ? (
+          <div className="py-1 text-center text-base font-black uppercase tracking-widest text-[#b83224]">UTSOLGT</div>
+        ) : fillPercent >= 80 ? (
+          <div className="text-xs font-bold text-[#b83224]">Få plasser igjen</div>
+        ) : fillPercent >= 50 ? (
+          <div className="text-xs font-bold text-zinc-600">Over halvparten solgt</div>
+        ) : null}
+        <div className="grid gap-2 min-[360px]:grid-cols-2">
           <Button asChild variant="outline" size={compact ? 'sm' : 'default'} className="rounded-none border-2 border-zinc-950 bg-transparent font-bold hover:bg-zinc-950 hover:text-white"><Link href={`/events/${show.slug}`}>Les mer <ArrowUpRight className="size-4" /></Link></Button>
-          <form action={startCheckoutAction}>
+          <form action={startCheckoutAction} className="w-full">
             <input type="hidden" name="show_id" value={show.id} />
             <input type="hidden" name="slug" value={show.slug} />
             <Button type="submit" size={compact ? 'sm' : 'default'} className="w-full rounded-none border-2 border-zinc-950 bg-[#b83224] font-bold text-white hover:bg-[#9f2d21]" disabled={soldOut}>

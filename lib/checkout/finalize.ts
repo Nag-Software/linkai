@@ -1,7 +1,6 @@
 import Stripe from 'stripe'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sendTicketPurchaseEmail } from '@/lib/email/mailer'
-import { trackPurchase } from '@/lib/tracking/stape'
 
 type FinalizeCheckoutResult = {
   result: 'created' | 'duplicate' | 'sold_out' | 'invalid_show' | 'missing_show' | 'unpaid' | 'failed'
@@ -90,9 +89,6 @@ export async function finalizeCheckoutSession(session: Stripe.Checkout.Session):
     emailSent = emailResult.success
     emailError = emailResult.error
   }
-
-  trackPurchase(completion.order_id).catch(console.error)
-
   return {
     result: completion.result,
     orderId: completion.order_id,

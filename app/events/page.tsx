@@ -37,11 +37,6 @@ export default async function EventsPage() {
               <h1 className="max-w-3xl text-[clamp(3rem,8vw,6.8rem)] font-black uppercase leading-[0.82] tracking-[-0.04em]">Kommende events</h1>
               <p className="mt-4 max-w-xl text-base font-medium text-zinc-700">Publiserte show, scener og billetter fra i dag og fremover.</p>
             </div>
-            <div className="grid grid-cols-3 border-2 border-zinc-950 bg-[#fbf7ec] shadow-[6px_6px_0_rgba(24,24,27,0.14)]">
-              <EventMetric value={shows.length.toString()} label="show" />
-              <EventMetric value={cappedShows.length ? openTickets.toString() : 'åpent'} label="billetter" />
-              <EventMetric value={venueCount.toString()} label="scener" />
-            </div>
           </div>
         </div>
         <div className="overflow-hidden border-t-2 border-zinc-950 bg-[#b83224] text-white">

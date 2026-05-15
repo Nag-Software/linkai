@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { createArtistAction } from './actions'
+import { ARTIST_ROLE_OPTIONS } from '@/lib/artist-roles'
 
 export default function NewArtistPage() {
   return (
@@ -56,7 +57,23 @@ export default function NewArtistPage() {
 
             <div className="space-y-1.5">
               <Label htmlFor="category">Kategori</Label>
-              <Input id="category" name="category" placeholder="Stand-up / improv / TV-komedie..." />
+              <div className="flex flex-wrap gap-2">
+                {ARTIST_ROLE_OPTIONS.map((role) => (
+                  <label key={role.value} className="cursor-pointer">
+                    <input
+                      id={role.value === 'headliner' ? 'category' : undefined}
+                      type="checkbox"
+                      name="category"
+                      value={role.value}
+                      defaultChecked={role.value === 'stand-up'}
+                      className="sr-only peer"
+                    />
+                    <span className="inline-flex items-center rounded-full border px-3 py-1.5 text-sm transition-colors peer-checked:border-primary peer-checked:bg-primary peer-checked:text-primary-foreground hover:bg-muted">
+                      {role.label}
+                    </span>
+                  </label>
+                ))}
+              </div>
             </div>
 
             <div className="space-y-1.5">
@@ -68,18 +85,6 @@ export default function NewArtistPage() {
                 placeholder="Kort artistbeskrivelse..."
                 className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring"
               />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="consent_ai_research">AI-samtykke</Label>
-              <select
-                id="consent_ai_research"
-                name="consent_ai_research"
-                className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value="false">Nei</option>
-                <option value="true">Ja</option>
-              </select>
             </div>
 
             <Button type="submit" className="w-full">Opprett artist</Button>

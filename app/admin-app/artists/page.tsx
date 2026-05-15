@@ -34,7 +34,7 @@ export default async function ArtistsPage({
 
   let query = db
     .from('artists')
-    .select('id, full_name, stage_name, email, status, admin_score, admin_energy_level, admin_tags, is_flagged, created_at')
+    .select('id, full_name, stage_name, email, status, admin_score, admin_energy_level, is_flagged, created_at')
     .order('created_at', { ascending: false })
     .limit(200)
 
@@ -48,14 +48,6 @@ export default async function ArtistsPage({
   }
 
   const { data: artists } = await query
-
-  const artistIds = (artists ?? []).map(a => a.id)
-  const { data: aiRows } = artistIds.length
-    ? await db.from('artist_ai_assessments')
-        .select('artist_id, ai_score_suggestion, ai_confidence, ai_status')
-        .in('artist_id', artistIds)
-    : { data: [] as Array<{ artist_id: string; ai_score_suggestion: number | null; ai_confidence: string | null; ai_status: string }> }
-  const aiMap = Object.fromEntries((aiRows ?? []).map(a => [a.artist_id, a]))
 
   const filters: { label: string; key: string; value: string }[] = [
     { label: 'Alle', key: 'status', value: '' },
@@ -91,7 +83,6 @@ export default async function ArtistsPage({
         <form action="/admin-app/artists" className="flex max-w-xl gap-2">
           {params.status && <input type="hidden" name="status" value={params.status} />}
           {params.energy && <input type="hidden" name="energy" value={params.energy} />}
-          {params.ai && <input type="hidden" name="ai" value={params.ai} />}
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -135,16 +126,13 @@ export default async function ArtistsPage({
                 <th className="text-left px-4 py-2.5 font-medium">E-post</th>
                 <th className="text-left px-4 py-2.5 font-medium">Status</th>
                 <th className="text-center px-4 py-2.5 font-medium">Score</th>
-                <th className="text-center px-4 py-2.5 font-medium">AI</th>
                 <th className="text-left px-4 py-2.5 font-medium">Energi</th>
-                <th className="text-left px-4 py-2.5 font-medium">Tags</th>
                 <th className="text-left px-4 py-2.5 font-medium">Dato</th>
                 <th className="px-4 py-2.5" />
               </tr>
             </thead>
             <tbody>
               {(artists ?? []).map((a) => {
-                const ai = aiMap[a.id]
                 return (
                   <tr key={a.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
                     <td className="px-4 py-3 flex items-center">
@@ -169,29 +157,12 @@ export default async function ArtistsPage({
                     <td className="px-4 py-3 text-center">
                       <span className="font-bold">{a.admin_score ?? '—'}</span>
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      {ai ? (
-                        <div className="flex flex-col items-center gap-0.5">
-                          <span className="font-medium">{ai.ai_score_suggestion ?? '—'}</span>
-                          <span className="text-xs text-muted-foreground">{ai.ai_confidence ?? ai.ai_status}</span>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">—</span>
-                      )}
-                    </td>
                     <td className="px-4 py-3">
                       {a.admin_energy_level ? (
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${energyColors[a.admin_energy_level]}`}>
                           {a.admin_energy_level}
                         </span>
                       ) : '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1">
-                        {(a.admin_tags ?? []).slice(0, 3).map((tag) => (
-                          <span key={tag} className="px-1.5 py-0.5 rounded bg-muted text-xs">{tag}</span>
-                        ))}
-                      </div>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground text-xs whitespace-nowrap">
                       {new Date(a.created_at).toLocaleDateString('nb-NO')}

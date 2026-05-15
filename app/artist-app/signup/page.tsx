@@ -1,4 +1,5 @@
-import { SignupForm } from '@/components/signup-form'
+import { PublicHeader } from '@/components/public/public-header'
+import { ArtistSignupForm } from '@/components/artist/artist-signup-form'
 
 export const metadata = { title: 'Registrer artistprofil — humor.events' }
 
@@ -10,9 +11,34 @@ export default async function ArtistSignupPage({
   const { status, error } = await searchParams
 
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-6 md:p-10">
-      <div className="w-full max-w-xl">
-        <SignupForm
+    <main className="min-h-svh bg-[#f3ead9] text-zinc-950">
+      <section className="relative isolate overflow-hidden border-b-2 border-zinc-950 bg-[#f3ead9] text-zinc-950">
+        <div
+          aria-hidden
+          className="absolute inset-0 opacity-[0.18]"
+          style={{
+            backgroundImage:
+              "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.45'/></svg>\")",
+          }}
+        />
+
+        <PublicHeader transparent tone="light" />
+
+        <div className="relative mx-auto max-w-6xl px-4 pb-8 pt-8 md:px-6 md:pb-10 md:pt-10 lg:px-8">
+          <div className="mb-5 inline-flex border border-zinc-950 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.22em]">
+            Portal / humor.events
+          </div>
+          <h1 className="max-w-[760px] text-[clamp(2.75rem,6.8vw,5.6rem)] font-black uppercase leading-[0.82] tracking-[-0.035em]">
+            Registrer komikerprofil
+          </h1>
+          <p className="mt-4 max-w-2xl text-sm font-medium text-zinc-700 md:text-base">
+            Send inn profil, video og kontaktinfo så bookingteamet kan vurdere deg til kommende kvelder hos humor.events.
+          </p>
+        </div>
+      </section>
+
+      <section className="mx-auto w-full max-w-6xl px-4 py-8 md:px-6 lg:px-8">
+        <ArtistSignupForm
           action="/artist-app/signup/submit"
           successMessage={status === 'submitted' ? 'Profilen er sendt til vurdering.' : undefined}
           errorMessage={
@@ -22,14 +48,18 @@ export default async function ArtistSignupPage({
                 ? 'Passordet må være minst 8 tegn.'
                 : error === 'invalid_email'
                   ? 'Ugyldig e-postadresse.'
-                  : error === 'unconfirmed'
-                    ? 'Kontoen er ikke aktiv ennå. Registrer artistprofil på nytt eller kontakt oss.'
-                    : error === 'failed'
-                      ? 'Kunne ikke opprette profilen. Prøv igjen.'
-                      : undefined
+                  : error === 'invalid_youtube'
+                    ? 'Legg inn en gyldig lenke til en YouTube-video.'
+                    : error === 'missing'
+                      ? 'Fyll ut alle obligatoriske felt før du sender inn.'
+                      : error === 'unconfirmed'
+                        ? 'Kontoen er ikke aktiv ennå. Registrer artistprofil på nytt eller kontakt oss.'
+                        : error === 'failed'
+                          ? 'Kunne ikke opprette profilen. Prøv igjen.'
+                          : undefined
           }
         />
-      </div>
-    </div>
+      </section>
+    </main>
   )
 }

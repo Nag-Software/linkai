@@ -34,7 +34,7 @@ create table if not exists artists (
   phone               text,
   profile_image_url   text,
   bio                 text,
-  category            text,
+  category            text[],
   language            text,
   social_links        jsonb,
   consent_ai_research boolean not null default false,
@@ -295,24 +295,6 @@ create table if not exists artist_invoices (
 );
 
 -- ─────────────────────────────────────────────────────────────
--- 5.14 tracking_events
--- ─────────────────────────────────────────────────────────────
-create table if not exists tracking_events (
-  id                uuid primary key default gen_random_uuid(),
-  show_id           uuid references shows(id) on delete set null,
-
-  event_name        text,
-  event_id          text unique,
-  event_source_url  text,
-  payload           jsonb,
-  status            text not null default 'pending'
-                      check (status in ('pending', 'sent', 'failed')),
-
-  created_at        timestamptz not null default now(),
-  sent_at           timestamptz
-);
-
--- ─────────────────────────────────────────────────────────────
 -- 5.15 email_logs
 -- ─────────────────────────────────────────────────────────────
 create table if not exists email_logs (
@@ -379,7 +361,6 @@ create index if not exists idx_tickets_ticket_code on tickets(ticket_code);
 create index if not exists idx_tickets_order_id on tickets(order_id);
 create index if not exists idx_artist_payouts_artist_id on artist_payouts(artist_id);
 create index if not exists idx_artist_invoices_artist_id on artist_invoices(artist_id);
-create index if not exists idx_tracking_events_event_id on tracking_events(event_id);
 create index if not exists idx_marketing_tasks_show_id on marketing_tasks(show_id);
 
 -- ─────────────────────────────────────────────────────────────

@@ -4,15 +4,13 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { approveArtist } from '@/lib/actions/artist'
-import { runArtistAiAssessment } from '@/lib/actions/ai'
-import { runAfterResponse } from '@/lib/background'
+import { canonicalRoleValues } from '@/lib/artist-roles'
 import type { Artist, ArtistType, EnergyLevel, ArtistGender, ArtistStatus } from '@/types/database'
 
 export async function saveArtistAdminReview(formData: FormData) {
   const artistId = formData.get('artist_id') as string
   const db = createAdminClient()
 
-  const tagsRaw = formData.getAll('admin_tags').map((t) => String(t).trim()).filter(Boolean)
   const energyRaw = ((formData.get('admin_energy_level') as string) || null) as EnergyLevel | null
   const statusRaw = (formData.get('status') as string) as ArtistStatus
   const genderRaw = ((formData.get('gender') as string) || null) as ArtistGender | null
@@ -23,7 +21,6 @@ export async function saveArtistAdminReview(formData: FormData) {
     admin_energy_level: energyRaw,
     admin_type: adminTypeRaw.length ? adminTypeRaw : null,
     gender: genderRaw,
-    admin_tags: tagsRaw.length ? tagsRaw : null,
     admin_notes: (formData.get('admin_notes') as string) || null,
     status: statusRaw,
     is_flagged: formData.get('is_flagged') === 'true',
@@ -48,39 +45,6 @@ export async function rejectArtistAction(formData: FormData) {
   revalidatePath(`/admin-app/artists/${artistId}`)
 }
 
-export async function rerunAiAction(formData: FormData) {
-  const artistId = formData.get('artist_id') as string
-  const db = createAdminClient()
-  await db.from('artist_ai_assessments').upsert({
-    artist_id: artistId,
-    ai_status: 'pending',
-    ai_last_checked_at: new Date().toISOString(),
-  }, { onConflict: 'artist_id', ignoreDuplicates: false })
-  runAfterResponse(`artist-ai-${artistId}`, async () => {
-    await runArtistAiAssessment(artistId)
-    revalidatePath(`/admin-app/artists/${artistId}`)
-  })
-  revalidatePath(`/admin-app/artists/${artistId}`)
-}
-
-export async function applyAiSuggestion(formData: FormData) {
-  const artistId = formData.get('artist_id') as string
-  const db = createAdminClient()
-  const { data: ai } = await db
-    .from('artist_ai_assessments')
-    .select('ai_score_suggestion, ai_energy_suggestion, ai_tags_suggestion')
-    .eq('artist_id', artistId)
-    .single()
-  if (ai) {
-    await db.from('artists').update({
-      admin_score: ai.ai_score_suggestion,
-      admin_energy_level: ai.ai_energy_suggestion,
-      admin_tags: ai.ai_tags_suggestion,
-    }).eq('id', artistId)
-  }
-  revalidatePath(`/admin-app/artists/${artistId}`)
-}
-
 export async function updateArtistProfile(formData: FormData) {
   const artistId = formData.get('artist_id') as string
   if (!artistId) throw new Error('Mangler artist_id')
@@ -91,17 +55,17 @@ export async function updateArtistProfile(formData: FormData) {
   if (socialLinksRaw) {
     try { social_links = JSON.parse(socialLinksRaw) } catch { social_links = null }
   }
+  const categoryValues = canonicalRoleValues(formData.getAll('category').map((value) => String(value)))
 
   const update: Partial<Artist> = {}
   if (formData.has('full_name')) update.full_name = (formData.get('full_name') as string).trim()
   if (formData.has('stage_name')) update.stage_name = (formData.get('stage_name') as string).trim() || null
   if (formData.has('email')) update.email = (formData.get('email') as string).trim()
   if (formData.has('phone')) update.phone = (formData.get('phone') as string).trim() || null
-  if (formData.has('category')) update.category = (formData.get('category') as string).trim() || null
+  if (formData.has('category') || formData.has('category_present')) update.category = categoryValues.length > 0 ? categoryValues : null
   if (formData.has('language')) update.language = (formData.get('language') as string).trim() || null
   if (formData.has('bio')) update.bio = (formData.get('bio') as string).trim() || null
   if (formData.has('gender')) update.gender = ((formData.get('gender') as string).trim() || null) as Artist['gender']
-  if (formData.has('consent_ai_research')) update.consent_ai_research = formData.get('consent_ai_research') === 'true'
   if (formData.has('social_links')) update.social_links = social_links
 
   await db.from('artists').update(update).eq('id', artistId)

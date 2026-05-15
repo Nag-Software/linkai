@@ -1,18 +1,13 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard,
   Users,
   CalendarDays,
-  BookOpen,
   ShoppingCart,
-  Ticket,
-  Wallet,
-  Megaphone,
-  Mail,
-  Radar,
   Settings,
   LogOut,
   Music2,
@@ -28,18 +23,13 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
+import { MusicNote01FreeIcons } from '@hugeicons/core-free-icons'
 
 const navItems = [
   { label: 'Dashboard', href: '/', icon: LayoutDashboard, exact: true },
   { label: 'Komikere', href: '/artists', icon: Users },
   { label: 'Shows', href: '/shows', icon: CalendarDays },
-  { label: 'Bookings', href: '/bookings', icon: BookOpen },
   { label: 'Orders', href: '/orders', icon: ShoppingCart },
-  { label: 'Tickets', href: '/tickets', icon: Ticket },
-  { label: 'Komiker Economy', href: '/artist-economy', icon: Wallet },
-  { label: 'Marketing', href: '/marketing', icon: Megaphone },
-  { label: 'Email Logs', href: '/email-logs', icon: Mail },
-  { label: 'Tracking', href: '/tracking', icon: Radar },
   { label: 'Settings', href: '/settings', icon: Settings },
 ]
 
@@ -60,10 +50,10 @@ export function AdminSidebar({ user }: AdminSidebarProps) {
             <SidebarMenuButton size="lg" asChild>
               <Link href={pathPrefix}>
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <Music2 className="size-4" />
+                  <Image src="/favicon.svg" className="rounded-full p-0 outline-2 border-1" alt="" width={32} height={32} />
                 </div>
                 <div className="flex flex-col gap-0.5 leading-none">
-                  <span className="font-semibold">humor.events</span>
+                  <span className="font-semibold">Bookingsystem</span>
                   <span className="text-xs text-muted-foreground capitalize">{user.role}</span>
                 </div>
               </Link>

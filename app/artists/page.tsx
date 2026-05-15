@@ -1,6 +1,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowLeft, ArrowRight, ArrowUpRight } from 'lucide-react'
+import { formatArtistRoleSummary } from '@/lib/artist-roles'
 import { artistDisplayName, artistInitials, getPublicArtists } from '@/lib/public-artists'
 import { shouldBypassImageOptimization } from '@/lib/utils'
 import { PublicHeader } from '@/components/public/public-header'
@@ -74,16 +75,13 @@ export default async function ArtistsPage() {
               <div className="grid gap-3 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-zinc-500">{artist.category ?? 'Artist'}{artist.admin_score != null ? ` · score ${artist.admin_score}` : ''}</p>
+                    <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-zinc-500">{formatArtistRoleSummary(artist.category, 'Komiker')}{artist.admin_score != null ? ` · score ${artist.admin_score}` : ''}</p>
                     <h2 className="text-xl font-black leading-tight tracking-tight">{artistDisplayName(artist)}</h2>
                     {artist.stage_name && <p className="text-sm font-medium text-zinc-600">{artist.full_name}</p>}
                   </div>
                   <ArrowUpRight className="size-4 shrink-0 text-zinc-500 transition group-hover:text-[#b83224]" />
                 </div>
                 {artist.bio && <p className="line-clamp-3 text-sm text-zinc-600">{artist.bio}</p>}
-                <div className="flex flex-wrap gap-1.5">
-                  {(artist.admin_tags ?? []).slice(0, 4).map((tag) => <span key={tag} className="border border-zinc-950/30 px-2 py-1 text-xs font-medium text-zinc-600">{tag}</span>)}
-                </div>
               </div>
             </Link>
           ))}
