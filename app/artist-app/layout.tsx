@@ -37,7 +37,7 @@ export default async function ArtistLayout({ children }: { children: React.React
   if (!artist) redirect('/artist-app/signup?error=missing')
 
   return (
-    <div className="flex min-h-svh flex-col bg-[#f3ead9] text-zinc-950">
+    <div className="flex min-h-svh flex-col bg-white text-black">
       <ArtistTopbar pathname={pathname} name={artist.stage_name ?? artist.full_name} />
       <main className="flex flex-1 flex-col">{children}</main>
     </div>
@@ -66,7 +66,7 @@ function ArtistTopbar({ pathname, name }: { pathname: string; name: string }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={active ? 'font-medium text-white transition-colors hover:text-white' : 'transition-colors hover:text-white'}
+                className={active ? 'font-medium text-[#ff6bff] transition-colors' : 'transition-colors hover:text-white'}
               >
                 {item.label}
               </Link>
