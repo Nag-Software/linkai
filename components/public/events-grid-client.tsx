@@ -8,8 +8,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { CalendarIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { PublicShow } from '@/lib/public-events'
+import { nb } from 'date-fns/locale'
 
-const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
+const MONTHS = ['JAN','FEB','MAR','APR','MAI','JUN','JUL','AUG','SEP','OKT','NOV','DES']
 
 function formatCardDate(show: Pick<PublicShow, 'date' | 'start_time'>) {
   const dt = new Date(`${show.date}T${show.start_time}`)
@@ -29,7 +30,7 @@ interface Props {
   userCountry?: string
 }
 
-export function EventsGridClient({ shows, userCountry = 'hele norge' }: Props) {
+export function EventsGridClient({ shows, userCountry = 'kvelder' }: Props) {
   const [date, setDate] = useState<Date | undefined>(undefined)
   const [initialSet, setInitialSet] = useState(false)
 
@@ -64,7 +65,7 @@ export function EventsGridClient({ shows, userCountry = 'hele norge' }: Props) {
       <div>
         <div className="flex flex-wrap items-center gap-0 mb-6 md:mb-8 animate-fade-in" style={{ animationDelay: '0.8s', animationFillMode: 'both' }}>
           <h2 className="text-base md:text-lg lg:text-xl font-normal w-full sm:w-auto mb-2 sm:mb-0">
-            Utforsk eventer i
+            Norges morsomste
           </h2>
           <span className="text-base md:text-lg lg:text-xl font-normal border border-black px-2 py-1 sm:ml-2">
             {userCountry}
@@ -81,11 +82,11 @@ export function EventsGridClient({ shows, userCountry = 'hele norge' }: Props) {
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date ? formatDateLabel(date) : <span>Pick a date</span>}
+                  {date ? formatDateLabel(date) : <span>Velg en dato</span>}
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={date} onSelect={setDate} />
+                <Calendar mode="single" selected={date} onSelect={setDate} locale={nb} />
               </PopoverContent>
             </Popover>
           </div>
@@ -97,11 +98,11 @@ export function EventsGridClient({ shows, userCountry = 'hele norge' }: Props) {
             className="hidden lg:block animate-fade-in lg:sticky lg:top-24 self-start"
             style={{ animationDelay: '0.9s', animationFillMode: 'both' }}
           >
-            <Calendar mode="single" selected={date} onSelect={setDate} className="mx-auto" />
+            <Calendar mode="single" selected={date} onSelect={setDate} className="mx-auto" locale={nb} />
           </div>
 
           {/* Event grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 lg:col-start-2 gap-5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 lg:col-start-2 gap-5">
             {filtered.length === 0 ? (
               <div className="col-span-full text-center py-12">
                 {date
@@ -130,13 +131,13 @@ function EventCard({ show }: { show: PublicShow }) {
   return (
     <Link href={`/events/${show.slug ?? show.id}`} className="relative cursor-pointer group block">
       <div className="overflow-hidden mb-3">
-        <div className="aspect-square bg-gray-300 bg-cover bg-center transition-transform duration-500 ease-out group-hover:scale-110 relative">
+        <div className="aspect-[2/3] bg-gray-300 bg-cover bg-center transition-transform duration-500 ease-out group-hover:scale-101 relative">
           {show.poster_url ? (
             <Image
               src={show.poster_url}
               alt={show.title}
               fill
-              className="object-cover"
+              className="object-contain"
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
             />
           ) : (
@@ -146,13 +147,13 @@ function EventCard({ show }: { show: PublicShow }) {
       </div>
       <div className="absolute top-4 left-4 flex flex-col gap-0">
         <div className="bg-white border border-black px-3 h-[23px] flex items-center">
-          <div className="text-[11px] font-medium uppercase leading-none">{formatCardDate(show)}</div>
+          <div className="text-[10px] sm:text-[13px] font-medium uppercase leading-none">{formatCardDate(show)}</div>
         </div>
-        <div className="bg-white border border-t-0 border-black px-3 h-[23px] flex items-center">
-          <div className="text-[11px] font-medium leading-none">{formatCardTime(show)}</div>
+        <div className="bg-white border border-black px-3 h-[23px] flex items-center">
+          <div className="text-[10px] sm:text-[13px] mx-auto font-medium leading-none">{formatCardTime(show)}</div>
         </div>
       </div>
-      <h3 className="text-lg font-medium">{show.title}</h3>
+      <h3 className="text-lg  font-medium">{show.title}</h3>
       <p className="text-sm text-gray-500 mt-1">{show.venue_name ?? show.venue_address ?? ''}</p>
     </Link>
   )

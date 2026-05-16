@@ -8,6 +8,7 @@ import { artistDisplayName, artistInitials, getPublicArtistById, getPublicArtist
 import { shouldBypassImageOptimization } from '@/lib/utils'
 import { PublicHeader } from '@/components/public/public-header'
 import { formatShortDate, formatShowTime } from '@/lib/public-events'
+import { Footer } from '@/components/Footer'
 
 type Props = {
   params: Promise<{ id: string }>
@@ -142,6 +143,7 @@ export default async function ArtistDetailPage({ params }: Props) {
           )}
         </aside>
       </section>
+      <Footer/>
     </main>
   )
 }

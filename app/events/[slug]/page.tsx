@@ -8,6 +8,7 @@ import { startCheckoutAction } from '../actions'
 import { formatShowDate, formatShowTime, formatTicketPrice, getPublicLineup, getPublishedShowBySlug, remainingTickets, ticketFillPercent } from '@/lib/public-events'
 import { shouldBypassImageOptimization } from '@/lib/utils'
 import { PublicHeader } from '@/components/public/public-header'
+import { Footer } from '@/components/Footer'
 
 type Props = {
   params: Promise<{ slug: string }>
@@ -175,6 +176,7 @@ export default async function EventDetailPage({ params, searchParams }: Props) {
           </div>
         </div>
       </section>
+      <Footer/>
     </main>
   )
 }

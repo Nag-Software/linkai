@@ -6,6 +6,7 @@ import { EventsGridClient } from '@/components/public/events-grid-client'
 import { CityTicker } from '@/components/public/city-ticker'
 import { getUpcomingPublishedShows } from '@/lib/public-events'
 import Link from 'next/link'
+import { Footer } from '@/components/Footer'
 
 export const metadata = {
   title: 'humor.events — finn stand-up nær deg',
@@ -63,15 +64,7 @@ export default async function Page() {
       {/* Date-filtered event grid */}
       <EventsGridClient shows={shows} />
 
-      {/* Footer */}
-      <footer className="border-t border-black/10 py-6 text-center text-sm font-medium text-zinc-500">
-        <div className="mb-2 flex flex-wrap items-center justify-center gap-2 px-4">
-          <span className="tracking-normal text-black">humor.events</span>™
-          <span className="mx-2 text-zinc-300">|</span>
-          <span>Norges morsomste kvelder</span>
-        </div>
-        <Link href="/artist-app/login" className="hover:text-black transition-colors">Komikerportalen</Link>
-      </footer>
+      <Footer/>
     </main>
   )
 }

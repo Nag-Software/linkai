@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight } from 'lucide-react'
 import { PublicEventCard } from '@/components/public/public-event-card'
 import { PublicHeader } from '@/components/public/public-header'
 import { getUpcomingPublishedShows } from '@/lib/public-events'
+import { Footer } from '@/components/Footer'
 
 export const metadata = {
   title: 'Events — humor.events',
@@ -16,7 +17,7 @@ export default async function EventsPage() {
 
   return (
     <main className="min-h-screen bg-white text-black">
-      <section className="border-b border-black/10">
+      <section className="">
         <PublicHeader transparent tone="light" />
         <div className="mx-auto max-w-6xl px-4 pb-10 pt-28 md:px-6 md:pb-14 lg:px-8">
           <Link href="/" className="mb-8 inline-flex items-center gap-2 text-sm font-medium transition-colors hover:text-[#ff6bff]">
@@ -28,18 +29,9 @@ export default async function EventsPage() {
             <p className="mt-4 max-w-xl text-base text-zinc-600">Publiserte show, scener og billetter fra i dag og fremover.</p>
           </div>
         </div>
-        <div className="overflow-hidden border-t border-black/10 bg-[#ff6bff]">
-          <div className="flex py-3 text-[10px] font-black uppercase tracking-[0.34em] text-black" style={{ animation: 'marquee 42s linear infinite' }}>
-            {[0, 1].map((i) => (
-              <span key={i} className="flex shrink-0 items-center gap-8 pr-8" aria-hidden={i > 0}>
-                <span>Program</span><span>·</span><span>Stand-up</span><span>·</span><span>Oslo</span><span>·</span><span>Billetter</span><span>·</span><span>humor.events</span><span>·</span>
-              </span>
-            ))}
-          </div>
-        </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-4 py-10 md:px-6 lg:px-8">
+      <section className="mx-auto max-w-6xl px-4 py-5 md:px-6 lg:px-8">
         <div className="mb-5 flex items-end justify-between gap-4 border-b border-black pb-3">
           <h2 className="text-2xl font-medium">Alle show</h2>
           <Link href="/artists" className="inline-flex items-center gap-1.5 text-sm font-medium transition-colors hover:text-[#ff6bff]">
@@ -55,6 +47,7 @@ export default async function EventsPage() {
           </div>
         )}
       </section>
+      <Footer/>
     </main>
   )
 }

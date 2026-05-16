@@ -5,6 +5,7 @@ import { formatArtistRoleSummary } from '@/lib/artist-roles'
 import { artistDisplayName, artistInitials, getPublicArtists } from '@/lib/public-artists'
 import { shouldBypassImageOptimization } from '@/lib/utils'
 import { PublicHeader } from '@/components/public/public-header'
+import { Footer } from '@/components/Footer'
 
 export const metadata = {
   title: 'Artister — humor.events',
@@ -80,6 +81,7 @@ export default async function ArtistsPage() {
           </div>
         )}
       </section>
+      <Footer/>
     </main>
   )
 }
