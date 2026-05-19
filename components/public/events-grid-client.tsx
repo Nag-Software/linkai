@@ -1,28 +1,35 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { CalendarIcon } from 'lucide-react'
+import { ArrowUpRight, CalendarIcon, Ticket } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ToastActionForm } from '@/components/toast-action-form'
+import { Button } from '@/components/ui/button'
+import { startCheckoutAction } from '@/app/events/actions'
 import type { PublicShow } from '@/lib/public-events'
+import { formatShortDate, formatShowTime, formatTicketPrice, remainingTickets, ticketFillPercent } from '@/lib/public-events'
 import { nb } from 'date-fns/locale'
-
-const MONTHS = ['JAN','FEB','MAR','APR','MAI','JUN','JUL','AUG','SEP','OKT','NOV','DES']
-
-function formatCardDate(show: Pick<PublicShow, 'date' | 'start_time'>) {
-  const dt = new Date(`${show.date}T${show.start_time}`)
-  return `${MONTHS[dt.getMonth()]} ${dt.getDate()}`
-}
-
-function formatCardTime(show: Pick<PublicShow, 'start_time'>) {
-  return show.start_time?.slice(0, 5) ?? ''
-}
 
 function formatDateLabel(d: Date) {
   return d.toLocaleDateString('nb-NO', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+function getInitialDate(shows: PublicShow[]) {
+  const today = new Date()
+  const hasToday = shows.some((show) => {
+    const showDate = new Date(show.date)
+    return (
+      showDate.getFullYear() === today.getFullYear() &&
+      showDate.getMonth() === today.getMonth() &&
+      showDate.getDate() === today.getDate()
+    )
+  })
+
+  return hasToday ? today : undefined
 }
 
 interface Props {
@@ -31,32 +38,15 @@ interface Props {
 }
 
 export function EventsGridClient({ shows, userCountry = 'kvelder' }: Props) {
-  const [date, setDate] = useState<Date | undefined>(undefined)
-  const [initialSet, setInitialSet] = useState(false)
+  const [date, setDate] = useState<Date | undefined>(() => getInitialDate(shows))
 
-  useEffect(() => {
-    if (!initialSet && shows.length > 0) {
-      const today = new Date()
-      const hasToday = shows.some((s) => {
-        const d = new Date(s.date)
-        return (
-          d.getFullYear() === today.getFullYear() &&
-          d.getMonth() === today.getMonth() &&
-          d.getDate() === today.getDate()
-        )
-      })
-      if (hasToday) setDate(today)
-      setInitialSet(true)
-    }
-  }, [shows, initialSet])
-
-  const filtered = shows.filter((s) => {
+  const filtered = shows.filter((show) => {
     if (!date) return true
-    const d = new Date(s.date)
+    const showDate = new Date(show.date)
     return (
-      d.getFullYear() === date.getFullYear() &&
-      d.getMonth() === date.getMonth() &&
-      d.getDate() === date.getDate()
+      showDate.getFullYear() === date.getFullYear() &&
+      showDate.getMonth() === date.getMonth() &&
+      showDate.getDate() === date.getDate()
     )
   })
 
@@ -102,7 +92,7 @@ export function EventsGridClient({ shows, userCountry = 'kvelder' }: Props) {
           </div>
 
           {/* Event grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 lg:col-start-2 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 lg:col-start-2 gap-5">
             {filtered.length === 0 ? (
               <div className="col-span-full text-center py-12">
                 {date
@@ -128,33 +118,77 @@ export function EventsGridClient({ shows, userCountry = 'kvelder' }: Props) {
 }
 
 function EventCard({ show }: { show: PublicShow }) {
+  const remaining = remainingTickets(show)
+  const soldOut = remaining === 0
+  const fillPercent = ticketFillPercent(show)
+  const lowStock = remaining !== null && remaining > 0 && (remaining <= 10 || fillPercent >= 80)
+  const [day, month = ''] = formatShortDate(show.date).split(' ')
+  const eventHref = `/events/${show.slug ?? show.id}`
+  const showLocation = show.venue_name ?? show.venue_address ?? 'Sted kommer'
+  const statusLabel = soldOut ? 'Utsolgt' : lowStock ? 'Få igjen' : null
+
   return (
-    <Link href={`/events/${show.slug ?? show.id}`} className="relative cursor-pointer group block">
-      <div className="overflow-hidden mb-3">
-        <div className="aspect-[2/3] bg-gray-300 bg-cover bg-center transition-transform duration-500 ease-out group-hover:scale-101 relative">
-          {show.poster_url ? (
-            <Image
-              src={show.poster_url}
-              alt={show.title}
-              fill
-              className="object-contain"
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-            />
-          ) : (
-            <div className="w-full h-full bg-zinc-900" />
-          )}
+    <article className="group flex h-full flex-col overflow-hidden border border-black bg-white transition hover:-translate-y-0.5 hover:shadow-[4px_4px_0_rgba(0,0,0,0.12)]">
+      <Link href={eventHref} className="block">
+        <div className="relative flex justify-center border-b border-black bg-zinc-950 p-3 sm:p-4">
+          <div className="absolute left-3 top-3 z-10 grid size-12 place-items-center border border-black bg-white text-center text-black shadow-[2px_2px_0_rgba(255,255,255,0.18)] sm:left-4 sm:top-4 sm:size-14">
+            <div>
+              <div className="text-2xl font-medium leading-none">{Number(day)}</div>
+              <div className="mt-0.5 text-[9px] font-bold uppercase tracking-widest text-zinc-500 sm:text-[10px]">{month.replace('.', '')}</div>
+            </div>
+          </div>
+
+          <div className="relative aspect-[3/4] w-[54%] min-w-28 max-w-40 overflow-hidden border border-white/70 bg-white transition duration-500 group-hover:scale-[1.015] sm:max-w-44">
+            {show.poster_url ? (
+              <Image
+                src={show.poster_url}
+                alt={show.title}
+                fill
+                className="object-contain"
+                sizes="(max-width: 640px) 64vw, (max-width: 1024px) 34vw, 16vw"
+              />
+            ) : (
+              <div className="flex h-full flex-col justify-between bg-black p-4 text-white">
+                <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-zinc-400">humor.events</span>
+                <strong className="text-2xl font-medium leading-none">{show.title}</strong>
+              </div>
+            )}
+          </div>
+        </div>
+      </Link>
+
+      <div className="flex flex-1 flex-col gap-7 bg-white p-4 sm:p-5">
+        <div className="grid gap-3">
+          <div className="flex min-h-8 items-start justify-between gap-3">
+            <span className="text-sm font-medium uppercase tracking-[0.22em] text-zinc-500">{formatShowTime(show)}</span>
+            {statusLabel && (
+              <span className={cn(
+                'shrink-0 rounded-full border border-black px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em]',
+                soldOut ? 'bg-black text-white' : 'bg-[#ff6bff] text-black'
+              )}>
+                {statusLabel}
+              </span>
+            )}
+          </div>
+          <div>
+            <h3 className="text-xl font-medium leading-tight tracking-normal">{show.title}</h3>
+            <p className="mt-2 text-sm leading-relaxed text-zinc-500">{showLocation} · {formatTicketPrice(show)}</p>
+          </div>
+        </div>
+
+        <div className="mt-auto grid grid-cols-2 gap-2">
+          <Button asChild variant="outline" className="h-11 rounded-none border border-black bg-transparent text-sm font-medium text-black hover:bg-black hover:text-white">
+            <Link href={eventHref}>Les mer <ArrowUpRight className="size-5" /></Link>
+          </Button>
+          <ToastActionForm action={startCheckoutAction} className="w-full">
+            <input type="hidden" name="show_id" value={show.id} />
+            <input type="hidden" name="slug" value={show.slug ?? show.id} />
+            <Button type="submit" className="h-11 w-full rounded-none border border-black bg-black text-sm font-medium text-white hover:border-[#ff6bff] hover:bg-[#ff6bff] hover:text-black disabled:opacity-45" disabled={soldOut}>
+              <Ticket className="size-5" /> {soldOut ? 'Utsolgt' : 'Kjøp'}
+            </Button>
+          </ToastActionForm>
         </div>
       </div>
-      <div className="absolute top-4 left-4 flex flex-col gap-0">
-        <div className="bg-white border border-black px-3 h-[23px] flex items-center">
-          <div className="text-[10px] sm:text-[13px] font-medium uppercase leading-none">{formatCardDate(show)}</div>
-        </div>
-        <div className="bg-white border border-black px-3 h-[23px] flex items-center">
-          <div className="text-[10px] sm:text-[13px] mx-auto font-medium leading-none">{formatCardTime(show)}</div>
-        </div>
-      </div>
-      <h3 className="text-lg  font-medium">{show.title}</h3>
-      <p className="text-sm text-gray-500 mt-1">{show.venue_name ?? show.venue_address ?? ''}</p>
-    </Link>
+    </article>
   )
 }
