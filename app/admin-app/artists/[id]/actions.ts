@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { approveArtist } from '@/lib/actions/artist'
 import { canonicalRoleValues } from '@/lib/artist-roles'
-import type { Artist, ArtistType, EnergyLevel, ArtistGender, ArtistStatus } from '@/types/database'
+import type { Artist, EnergyLevel, ArtistGender, ArtistStatus } from '@/types/database'
 
 export async function saveArtistAdminReview(formData: FormData) {
   const artistId = formData.get('artist_id') as string
@@ -14,12 +14,12 @@ export async function saveArtistAdminReview(formData: FormData) {
   const energyRaw = ((formData.get('admin_energy_level') as string) || null) as EnergyLevel | null
   const statusRaw = (formData.get('status') as string) as ArtistStatus
   const genderRaw = ((formData.get('gender') as string) || null) as ArtistGender | null
-  const adminTypeRaw = formData.getAll('admin_type').map((t) => String(t)) as ArtistType[]
+  const categoryValues = canonicalRoleValues(formData.getAll('category').map((value) => String(value)))
 
   await db.from('artists').update({
     admin_score: formData.get('admin_score') ? Number(formData.get('admin_score')) : null,
     admin_energy_level: energyRaw,
-    admin_type: adminTypeRaw.length ? adminTypeRaw : null,
+    category: categoryValues.length ? categoryValues : null,
     gender: genderRaw,
     admin_notes: (formData.get('admin_notes') as string) || null,
     status: statusRaw,

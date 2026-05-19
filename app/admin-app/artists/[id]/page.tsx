@@ -23,7 +23,7 @@ export default async function ArtistDetailPage({ params }: { params: Promise<{ i
   if (!artist) notFound()
 
   const scoreOptions = Array.from({ length: 10 }, (_, i) => i + 1)
-  const normalizedAdminTypes = normalizeArtistRoleList(artist.admin_type ?? [])
+  const normalizedCategories = normalizeArtistRoleList(artist.category ?? [])
 
   return (
     <div>
@@ -61,7 +61,7 @@ export default async function ArtistDetailPage({ params }: { params: Promise<{ i
         {/* ── Right: Admin review form ── */}
         <div className="space-y-4">
           <section className="rounded-xl border bg-card p-5 space-y-5">
-            <h2 className="font-semibold text-sm">Admin-vurdering</h2>
+            <h2 className="font-semibold text-sm">Komikervurdering</h2>
 
             <ToastActionForm action={saveArtistAdminReview} className="space-y-5" successMessage="Vurderingen er lagret.">
               <input type="hidden" name="artist_id" value={artist.id} />
@@ -84,7 +84,6 @@ export default async function ArtistDetailPage({ params }: { params: Promise<{ i
                 current={artist.admin_energy_level ?? ''}
                 chips={[
                   { value: 'high', label: 'Høy' },
-                  { value: 'medium', label: 'Middels' },
                   { value: 'low', label: 'Lav' },
                 ]}
               />
@@ -110,17 +109,17 @@ export default async function ArtistDetailPage({ params }: { params: Promise<{ i
                 </div>
               </div>
 
-              {/* Type — multi-select */}
+              {/* Kategorier — multi-select */}
               <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground">Type</p>
+                <p className="text-xs font-medium text-muted-foreground">Kategorier</p>
                 <div className="flex flex-wrap gap-1.5">
                   {ARTIST_ROLE_OPTIONS.map((chip) => (
                     <label key={chip.value} className="cursor-pointer">
                       <input
                         type="checkbox"
-                        name="admin_type"
+                        name="category"
                         value={chip.value}
-                        defaultChecked={normalizedAdminTypes.includes(chip.value)}
+                        defaultChecked={normalizedCategories.includes(chip.value)}
                         className="sr-only peer"
                       />
                       <span className="inline-flex items-center px-3 py-1 rounded-full border text-xs font-medium transition-colors select-none peer-checked:bg-primary peer-checked:text-primary-foreground peer-checked:border-primary hover:bg-muted">

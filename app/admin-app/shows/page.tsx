@@ -32,7 +32,7 @@ const statusColors: Record<ShowStatus, string> = {
 }
 
 const statusFilters: Array<{ value: ShowStatus; label: string }> = [
-  { value: 'draft', label: 'Utkast' },
+  { value: 'draft', label: 'Planlegger' },
   { value: 'booking', label: 'Booking' },
   { value: 'fullbooked', label: 'Fullbooket' },
   { value: 'published', label: 'Publisert' },
@@ -41,7 +41,7 @@ const statusFilters: Array<{ value: ShowStatus; label: string }> = [
 ]
 
 const statusLabels: Record<ShowStatus, string> = {
-  draft: 'Utkast',
+  draft: 'Planlegger',
   booking: 'Booking',
   fullbooked: 'Fullbooket',
   published: 'Publisert',

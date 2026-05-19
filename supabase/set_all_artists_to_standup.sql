@@ -6,14 +6,12 @@ begin;
 update artists
 set
   category = array['stand-up']::text[],
-  admin_type = array['stand-up']::text[],
   updated_at = now()
-where category is distinct from array['stand-up']::text[]
-   or admin_type is distinct from array['stand-up']::text[];
+where category is distinct from array['stand-up']::text[];
 
 commit;
 
 -- Optional verification
-select id, full_name, stage_name, category, admin_type
+select id, full_name, stage_name, category
 from artists
 order by created_at desc;

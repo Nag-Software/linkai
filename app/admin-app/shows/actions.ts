@@ -8,13 +8,26 @@ import { acceptBookingOfferById, automateFullbookedShow, bookShow, cancelConfirm
 import { generateShowPoster } from '@/lib/actions/ai'
 import { runAfterResponse } from '@/lib/background'
 import { canonicalRoleLabel } from '@/lib/artist-roles'
-import type { BookingOfferStatus, ConfirmedSpotStatus, RequirementCompensationType, RequirementEnergy, RequirementGender, ShowStatus } from '@/types/database'
+import type { BookingOfferStatus, ConfirmedSpotStatus, MarketingDesignFileType, RequirementCompensationType, RequirementEnergy, RequirementGender, ShowStatus } from '@/types/database'
 
 export type ManualSpotActionState = {
   status: 'idle' | 'success' | 'error'
   message: string | null
   submittedAt: number | null
 }
+
+const MARKETING_DESIGN_BUCKET = 'show-marketing-designs'
+const MAX_MARKETING_DESIGN_BYTES = 50 * 1024 * 1024
+const MARKETING_DESIGN_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp', 'gif', 'avif', 'heic', 'heif'])
+const MARKETING_DESIGN_IMAGE_MIME_TYPES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/gif',
+  'image/avif',
+  'image/heic',
+  'image/heif',
+])
 
 function manualSpotState(status: ManualSpotActionState['status'], message: string): ManualSpotActionState {
   return { status, message, submittedAt: Date.now() }
@@ -23,6 +36,37 @@ function manualSpotState(status: ManualSpotActionState['status'], message: strin
 function optionalText(value: FormDataEntryValue | null) {
   const text = String(value ?? '').trim()
   return text.length > 0 ? text : null
+}
+
+function sanitizeStorageFileName(value: string) {
+  const fallback = 'design-file'
+  const normalized = value
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+
+  return normalized || fallback
+}
+
+function fileExtension(fileName: string) {
+  return fileName.split('.').pop()?.toLowerCase() ?? ''
+}
+
+function marketingDesignFileType(file: File): MarketingDesignFileType | null {
+  const extension = fileExtension(file.name)
+  const mimeType = file.type.toLowerCase()
+
+  if (MARKETING_DESIGN_IMAGE_EXTENSIONS.has(extension) || MARKETING_DESIGN_IMAGE_MIME_TYPES.has(mimeType)) {
+    return 'image'
+  }
+
+  return null
+}
+
+function marketingDesignMimeType(file: File) {
+  if (file.type) return file.type
+  return 'application/octet-stream'
 }
 
 function optionalInteger(value: FormDataEntryValue | null) {
@@ -173,6 +217,85 @@ function scheduleFullbookedAutomation(showId: string, reason: string) {
   })
 }
 
+async function excludeArtistFromAutomaticBooking(
+  db: ReturnType<typeof createAdminClient>,
+  showId: string,
+  artistId: string,
+  reason: string,
+) {
+  const { error } = await db
+    .from('show_artist_booking_exclusions')
+    .upsert({ show_id: showId, artist_id: artistId, reason }, { onConflict: 'show_id,artist_id' })
+
+  if (error) throw new Error(error.message)
+}
+
+async function cloneMarketingDesigns(
+  db: ReturnType<typeof createAdminClient>,
+  templateShowId: string,
+  newShowId: string,
+) {
+  const [{ data: templateShow }, { data: templateDesigns }] = await Promise.all([
+    db.from('shows').select('selected_marketing_design_id').eq('id', templateShowId).single(),
+    db
+      .from('show_marketing_designs')
+      .select('id, label, file_url, file_path, file_name, mime_type, file_type, file_size')
+      .eq('show_id', templateShowId)
+      .order('created_at'),
+  ])
+
+  if (!templateDesigns?.length) return
+
+  let selectedMarketingDesignId: string | null = null
+
+  for (const design of templateDesigns) {
+    const safeName = sanitizeStorageFileName(design.file_name)
+    const nextPath = `${newShowId}/${crypto.randomUUID()}-${safeName}`
+    let filePath = design.file_path
+    let fileUrl = design.file_url
+
+    const { error: copyError } = await db.storage
+      .from(MARKETING_DESIGN_BUCKET)
+      .copy(design.file_path, nextPath)
+
+    if (copyError) throw new Error('Kunne ikke kopiere designfilene fra showet som klones.')
+
+    filePath = nextPath
+    const { data: urlData } = db.storage.from(MARKETING_DESIGN_BUCKET).getPublicUrl(nextPath)
+    fileUrl = urlData.publicUrl
+
+    const { data: clonedDesign, error } = await db
+      .from('show_marketing_designs')
+      .insert({
+        show_id: newShowId,
+        label: design.label,
+        file_url: fileUrl,
+        file_path: filePath,
+        file_name: design.file_name,
+        mime_type: design.mime_type,
+        file_type: design.file_type as MarketingDesignFileType,
+        file_size: design.file_size,
+      })
+      .select('id')
+      .single()
+
+    if (error) throw new Error(error.message)
+
+    if (design.id === templateShow?.selected_marketing_design_id) {
+      selectedMarketingDesignId = clonedDesign.id
+    }
+  }
+
+  if (selectedMarketingDesignId) {
+    const { error } = await db
+      .from('shows')
+      .update({ selected_marketing_design_id: selectedMarketingDesignId })
+      .eq('id', newShowId)
+
+    if (error) throw new Error(error.message)
+  }
+}
+
 export async function createShowAction(formData: FormData) {
   const input = {
     title: formData.get('title') as string,
@@ -271,8 +394,138 @@ export async function cloneShowAction(formData: FormData) {
     await db.from('show_requirements').insert(newReqs)
   }
 
-  scheduleShowAutomation(show.id, 'clone-book')
+  await cloneMarketingDesigns(db, templateId, show.id)
+
   redirect(`/admin-app/shows/${show.id}?tab=lineup`)
+}
+
+export async function uploadMarketingDesignAction(formData: FormData) {
+  const showId = formData.get('show_id') as string
+  const designFile = formData.get('design_file')
+
+  if (!showId) throw new Error('Show mangler.')
+  if (!(designFile instanceof File) || designFile.size === 0) {
+    throw new Error('Velg en bildefil først.')
+  }
+
+  if (designFile.size > MAX_MARKETING_DESIGN_BYTES) {
+    throw new Error('Designfilen kan maks være 50 MB.')
+  }
+
+  const fileType = marketingDesignFileType(designFile)
+  if (!fileType) {
+    throw new Error('Design må være PNG, JPG, WebP, GIF, AVIF eller HEIC/HEIF.')
+  }
+
+  const db = createAdminClient()
+  const safeName = sanitizeStorageFileName(designFile.name)
+  const filePath = `${showId}/${crypto.randomUUID()}-${safeName}`
+  const mimeType = marketingDesignMimeType(designFile)
+
+  const { error: uploadError } = await db.storage
+    .from(MARKETING_DESIGN_BUCKET)
+    .upload(filePath, designFile, { contentType: mimeType, upsert: false })
+
+  if (uploadError) throw new Error('Designfilen kunne ikke lastes opp akkurat nå.')
+
+  const { data: urlData } = db.storage.from(MARKETING_DESIGN_BUCKET).getPublicUrl(filePath)
+  const { data: design, error: insertError } = await db
+    .from('show_marketing_designs')
+    .insert({
+      show_id: showId,
+      label: optionalText(formData.get('label')),
+      file_url: urlData.publicUrl,
+      file_path: filePath,
+      file_name: designFile.name,
+      mime_type: mimeType,
+      file_type: fileType,
+      file_size: designFile.size,
+    })
+    .select('id')
+    .single()
+
+  if (insertError) {
+    await db.storage.from(MARKETING_DESIGN_BUCKET).remove([filePath])
+    throw new Error(insertError.message)
+  }
+
+  const { data: show } = await db
+    .from('shows')
+    .select('selected_marketing_design_id')
+    .eq('id', showId)
+    .single()
+
+  if (!show?.selected_marketing_design_id) {
+    const { error } = await db
+      .from('shows')
+      .update({ selected_marketing_design_id: design.id })
+      .eq('id', showId)
+
+    if (error) throw new Error(error.message)
+  }
+
+  revalidatePath(`/admin-app/shows/${showId}`)
+}
+
+export async function selectMarketingDesignAction(formData: FormData) {
+  const showId = formData.get('show_id') as string
+  const designId = optionalText(formData.get('design_id'))
+  const db = createAdminClient()
+
+  if (!showId) throw new Error('Show mangler.')
+
+  if (designId) {
+    const { data: design, error } = await db
+      .from('show_marketing_designs')
+      .select('id')
+      .eq('id', designId)
+      .eq('show_id', showId)
+      .single()
+
+    if (error || !design) throw new Error('Designmalen finnes ikke på dette showet.')
+  }
+
+  const { error } = await db
+    .from('shows')
+    .update({ selected_marketing_design_id: designId })
+    .eq('id', showId)
+
+  if (error) throw new Error(error.message)
+  revalidatePath(`/admin-app/shows/${showId}`)
+}
+
+export async function deleteMarketingDesignAction(formData: FormData) {
+  const showId = formData.get('show_id') as string
+  const designId = formData.get('design_id') as string
+  const db = createAdminClient()
+
+  if (!showId || !designId) throw new Error('Mangler show eller design.')
+
+  const { data: design, error } = await db
+    .from('show_marketing_designs')
+    .select('file_path')
+    .eq('id', designId)
+    .eq('show_id', showId)
+    .single()
+
+  if (error || !design) throw new Error('Designmalen finnes ikke på dette showet.')
+
+  await db
+    .from('shows')
+    .update({ selected_marketing_design_id: null })
+    .eq('id', showId)
+    .eq('selected_marketing_design_id', designId)
+
+  const { error: deleteError } = await db
+    .from('show_marketing_designs')
+    .delete()
+    .eq('id', designId)
+    .eq('show_id', showId)
+
+  if (deleteError) throw new Error(deleteError.message)
+
+  await db.storage.from(MARKETING_DESIGN_BUCKET).remove([design.file_path])
+  revalidatePath(`/admin-app/shows/${showId}`)
 }
 
 export async function addRequirementAction(formData: FormData) {
@@ -306,8 +559,6 @@ export async function startBookingAction(formData: FormData) {
   for (const req of reqs) {
     if (!req.role_name?.trim()) throw new Error('Alle lineup-plasser må ha et rollenavn.')
     if (!req.compensation_type) throw new Error('Alle lineup-plasser må ha honorarmodell satt.')
-    if (req.compensation_type === 'fixed' && req.compensation_amount == null) throw new Error('Alle faste honorarer må ha et beløp.')
-    if (req.compensation_type === 'percent' && req.compensation_percent == null) throw new Error('Alle prosentbaserte honorarer må ha en prosentsats.')
   }
 
   const percentTotal = reqs
@@ -315,6 +566,7 @@ export async function startBookingAction(formData: FormData) {
     .reduce((sum, r) => sum + (r.compensation_percent ?? 0), 0)
   if (percentTotal > 100) throw new Error(`Prosentfordeling overstiger 100 % (${percentTotal} %).`)
 
+  await db.from('shows').update({ status: 'booking' }).eq('id', showId).eq('status', 'draft')
   scheduleShowAutomation(showId, 'manual-start')
   revalidatePath(`/admin-app/shows/${showId}`)
 }
@@ -348,7 +600,6 @@ export async function updateShowDetailsAction(formData: FormData) {
   }).eq('id', showId)
 
   if (error) throw new Error(error.message)
-  scheduleShowAutomation(showId, 'update-show')
   revalidatePath(`/admin-app/shows/${showId}`)
 }
 
@@ -363,6 +614,25 @@ export async function updateRequirementAction(formData: FormData) {
   const { error } = await db.from('show_requirements').update(input).eq('id', reqId)
 
   if (error) throw new Error(error.message)
+  revalidatePath(`/admin-app/shows/${showId}`)
+}
+
+export async function openRequirementEnergyLevelsAction(formData: FormData) {
+  const showId = formData.get('show_id') as string
+  const reqId = formData.get('req_id') as string
+  const db = createAdminClient()
+
+  if (!showId || !reqId) throw new Error('Mangler show eller spot.')
+
+  const { error } = await db
+    .from('show_requirements')
+    .update({ energy_level: 'any' })
+    .eq('id', reqId)
+    .eq('show_id', showId)
+
+  if (error) throw new Error(error.message)
+
+  scheduleShowAutomation(showId, `open-energy-${reqId}`)
   revalidatePath(`/admin-app/shows/${showId}`)
 }
 
@@ -450,6 +720,9 @@ export async function updateOfferStatusAction(formData: FormData) {
   }).eq('id', offerId)
 
   if (error) throw new Error(error.message)
+  if (status !== 'sent') {
+    scheduleShowAutomation(showId, `offer-status-${status}`)
+  }
   revalidatePath(`/admin-app/shows/${showId}`)
 }
 
@@ -457,7 +730,21 @@ export async function cancelOfferAction(formData: FormData) {
   const offerId = formData.get('offer_id') as string
   const showId = formData.get('show_id') as string
   const db = createAdminClient()
-  await db.from('booking_offers').update({ status: 'cancelled' }).eq('id', offerId)
+
+  const { data: offer, error: offerError } = await db
+    .from('booking_offers')
+    .select('artist_id')
+    .eq('id', offerId)
+    .eq('show_id', showId)
+    .maybeSingle()
+
+  if (offerError) throw new Error(offerError.message)
+
+  await db.from('booking_offers').update({ status: 'cancelled', responded_at: new Date().toISOString() }).eq('id', offerId)
+  if (offer) {
+    await excludeArtistFromAutomaticBooking(db, showId, offer.artist_id, 'admin_cancelled_offer')
+  }
+  scheduleShowAutomation(showId, 'cancel-offer')
   revalidatePath(`/admin-app/shows/${showId}`)
 }
 
@@ -478,6 +765,7 @@ export async function removeSpotAndReopenAction(formData: FormData) {
     .from('confirmed_spots')
     .select('id, artist_id, show_requirement_id')
     .eq('id', spotId)
+    .eq('show_id', showId)
     .single()
 
   if (!spot) throw new Error('Spot ikke funnet.')
@@ -495,6 +783,8 @@ export async function removeSpotAndReopenAction(formData: FormData) {
     .from('confirmed_spots')
     .update({ status: 'cancelled', cancelled_at: new Date().toISOString() })
     .eq('id', spotId)
+
+  await excludeArtistFromAutomaticBooking(db, showId, spot.artist_id, 'admin_removed_spot')
 
   // Send new offers with "Ledig spot" email in background
   runAfterResponse(`reopen-spot-${spotId}`, async () => {
@@ -528,6 +818,53 @@ export async function moveSpotAction(formData: FormData) {
     .from('confirmed_spots')
     .update({ show_requirement_id: newReqId })
     .eq('id', spotId)
+
+  if (error) throw new Error(error.message)
+  revalidatePath(`/admin-app/shows/${showId}`)
+}
+
+export async function movePendingOfferAction(formData: FormData) {
+  const offerId = formData.get('offer_id') as string
+  const newReqId = formData.get('show_requirement_id') as string
+  const showId = formData.get('show_id') as string
+  const db = createAdminClient()
+
+  if (!offerId || !newReqId || !showId) throw new Error('Mangler tilbud, spot eller show.')
+
+  const [{ data: offer }, { data: requirement }, { count: filled }] = await Promise.all([
+    db
+      .from('booking_offers')
+      .select('id, show_id, show_requirement_id, status')
+      .eq('id', offerId)
+      .eq('show_id', showId)
+      .single(),
+    db
+      .from('show_requirements')
+      .select('id, show_id, quantity, compensation_type, compensation_amount')
+      .eq('id', newReqId)
+      .eq('show_id', showId)
+      .single(),
+    db.from('confirmed_spots')
+      .select('*', { count: 'exact', head: true })
+      .eq('show_requirement_id', newReqId)
+      .in('status', ['confirmed', 'completed', 'paid']),
+  ])
+
+  if (!offer) throw new Error('Tilbudet finnes ikke på dette showet.')
+  if (!requirement) throw new Error('Spotten finnes ikke på dette showet.')
+  if (offer.status !== 'sent') throw new Error('Kun tilbud som venter svar kan flyttes.')
+  if (offer.show_requirement_id === newReqId) return
+  if ((filled ?? 0) >= requirement.quantity) throw new Error('Denne spotten er allerede fylt.')
+
+  const { error } = await db
+    .from('booking_offers')
+    .update({
+      show_requirement_id: newReqId,
+      fee_amount: requirement.compensation_type === 'fixed' ? requirement.compensation_amount : null,
+    })
+    .eq('id', offerId)
+    .eq('show_id', showId)
+    .eq('status', 'sent')
 
   if (error) throw new Error(error.message)
   revalidatePath(`/admin-app/shows/${showId}`)
@@ -612,7 +949,7 @@ export async function addArtistToRequirementAction(formData: FormData) {
 
   const feeAmount = requirement?.compensation_type === 'fixed' ? requirement.compensation_amount : null
 
-  const { data: spot, error } = await db.from('confirmed_spots').insert({
+  const { error } = await db.from('confirmed_spots').insert({
     show_id: showId,
     artist_id: artistId,
     show_requirement_id: requirementId,
@@ -620,7 +957,7 @@ export async function addArtistToRequirementAction(formData: FormData) {
     currency,
     status: 'confirmed',
     confirmed_at: new Date().toISOString(),
-  }).select('id').single()
+  })
 
   if (error) throw new Error(error.message)
 
@@ -674,7 +1011,7 @@ export async function addManualSpotAction(_prevState: ManualSpotActionState, for
     return manualSpotState('error', 'Denne rollen er allerede fylt. Øk antall plasser eller fjern en artist først.')
   }
 
-  const { data: spot, error } = await db.from('confirmed_spots').insert({
+  const { error } = await db.from('confirmed_spots').insert({
     show_id: showId,
     artist_id: artistId,
     show_requirement_id: requirementId,
@@ -682,7 +1019,7 @@ export async function addManualSpotAction(_prevState: ManualSpotActionState, for
     currency,
     status: 'confirmed',
     confirmed_at: new Date().toISOString(),
-  }).select('id').single()
+  })
 
   if (error) return manualSpotState('error', error.message)
 
@@ -715,19 +1052,21 @@ export async function updateSpotAction(formData: FormData) {
 
 export async function generatePosterAction(formData: FormData) {
   const showId = formData.get('show_id') as string
-  runAfterResponse(`generate-poster-${showId}`, async () => {
-    await generatePosterForShow(showId)
-    revalidatePath(`/admin-app/shows/${showId}`)
-    revalidatePath('/admin-app/marketing')
-  })
+
+  if (!showId) throw new Error('Mangler show-id for plakatgenerering.')
+
+  const posterUrl = await generatePosterForShow(showId)
   revalidatePath(`/admin-app/shows/${showId}`)
+  revalidatePath('/admin-app/marketing')
+
+  return { posterUrl }
 }
 
 async function generatePosterForShow(showId: string) {
   const db = createAdminClient()
 
   const [{ data: show }, { data: spots }] = await Promise.all([
-    db.from('shows').select('title, date, start_time, venue_name, venue_address').eq('id', showId).single(),
+    db.from('shows').select('title, date, start_time, venue_name, venue_address, selected_marketing_design_id').eq('id', showId).single(),
     db.from('confirmed_spots').select('artist_id, show_requirement_id').eq('show_id', showId).in('status', ['confirmed', 'completed', 'paid']),
   ])
 
@@ -747,6 +1086,25 @@ async function generatePosterForShow(showId: string) {
 
   if (!show) throw new Error('Show not found')
 
+  const { data: selectedDesign } = show.selected_marketing_design_id
+    ? await db
+      .from('show_marketing_designs')
+      .select('label, file_url, file_path, file_name, mime_type, file_type')
+      .eq('id', show.selected_marketing_design_id)
+      .eq('show_id', showId)
+      .maybeSingle()
+    : { data: null }
+  const { data: fallbackDesign } = selectedDesign
+    ? { data: null }
+    : await db
+      .from('show_marketing_designs')
+      .select('label, file_url, file_path, file_name, mime_type, file_type')
+      .eq('show_id', showId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+  const posterDesign = selectedDesign ?? fallbackDesign
+
   const posterUrl = await generateShowPoster(showId, {
     title: show.title,
     date: show.date,
@@ -761,16 +1119,29 @@ async function generatePosterForShow(showId: string) {
         role_name: requirementById.get(spot.show_requirement_id) ?? null,
       }]
     }),
+    designTemplate: posterDesign
+      ? {
+        label: posterDesign.label,
+        fileUrl: posterDesign.file_url,
+        filePath: posterDesign.file_path,
+        fileName: posterDesign.file_name,
+        mimeType: posterDesign.mime_type,
+      }
+      : null,
+    throwOnError: true,
   })
 
   if (!posterUrl) throw new Error('Kunne ikke generere plakat akkurat nå.')
 
-  await db.from('marketing_tasks').upsert({
+  const { error: taskError } = await db.from('marketing_tasks').upsert({
     show_id: showId,
     task_key: 'upload_poster',
     label: 'Lineup-plakat generert',
     is_completed: true,
   }, { onConflict: 'show_id,task_key', ignoreDuplicates: false })
+  if (taskError) console.warn('[Poster] Marketing task update failed:', taskError)
+
+  return posterUrl
 }
 
 export async function completeMarketingTask(formData: FormData) {

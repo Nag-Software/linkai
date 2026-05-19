@@ -15,7 +15,9 @@ import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
@@ -565,6 +567,31 @@ export function RequirementsTab({ showId, showStatus, showCurrency, requirements
 
   // ── Wizard submit ───────────────────────────────────────────────────────────
 
+  function submitDefault() {
+    const fd = new FormData()
+
+    fd.set('show_id', showId)
+    fd.set('role_name', "Stand-up")
+    fd.set('quantity', '1')
+    fd.set('min_score', "any")
+    fd.set('energy_level', "any")
+    fd.set('required_gender', "any")
+    fd.set('compensation_type', "")
+    fd.set('compensation_amount', "")
+    fd.set('compensation_percent', "")
+
+    startAdding(async () => {
+      try {
+        await addRequirementAction(fd)
+        setWizard(WIZARD_INITIAL)
+        toast.success('Krav lagt til')
+        router.refresh()
+      } catch (err: unknown) {
+        toast.error((err as Error)?.message ?? 'Feil ved lagring')
+      }
+    })
+  }
+
   function submitWizard() {
     const fd = new FormData()
     fd.set('show_id', showId)
@@ -765,10 +792,13 @@ export function RequirementsTab({ showId, showStatus, showCurrency, requirements
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectGroup>
+                          <SelectLabel>Velg minimumsscore</SelectLabel>
                         <SelectItem value="__none">Ingen krav</SelectItem>
                         {SCORE_OPTIONS.map((score) => (
                           <SelectItem key={score} value={score}>≥ {score}</SelectItem>
                         ))}
+                        </SelectGroup>
                       </SelectContent>
                     </Select>
                   </FieldCell>
@@ -782,9 +812,12 @@ export function RequirementsTab({ showId, showStatus, showCurrency, requirements
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectGroup>
+                          <SelectLabel>Velg energinivå</SelectLabel>
                         {ENERGY_OPTIONS.map((opt) => (
                           <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                         ))}
+                        </SelectGroup>
                       </SelectContent>
                     </Select>
                   </FieldCell>
@@ -798,9 +831,12 @@ export function RequirementsTab({ showId, showStatus, showCurrency, requirements
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectGroup>
+                          <SelectLabel>Velg kjønn</SelectLabel>
                         {GENDER_OPTIONS.map((opt) => (
                           <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                         ))}
+                        </SelectGroup>
                       </SelectContent>
                     </Select>
                   </FieldCell>
@@ -814,9 +850,12 @@ export function RequirementsTab({ showId, showStatus, showCurrency, requirements
                         <SelectValue placeholder="Ikke satt" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="__unset">Ikke satt</SelectItem>
-                        <SelectItem value="fixed">Fast beløp</SelectItem>
-                        <SelectItem value="percent">Prosent</SelectItem>
+                        <SelectGroup>
+                          <SelectLabel>Velg honorarmodell</SelectLabel>
+                          <SelectItem value="__unset">Ikke satt</SelectItem>
+                          <SelectItem value="fixed">Fast beløp</SelectItem>
+                          <SelectItem value="percent">Prosent</SelectItem>
+                        </SelectGroup>
                       </SelectContent>
                     </Select>
                   </FieldCell>
@@ -858,7 +897,8 @@ export function RequirementsTab({ showId, showStatus, showCurrency, requirements
         wizard.step === 0 ? (
           <button
             type="button"
-            onClick={() => setWizard({ ...WIZARD_INITIAL, step: 1, lineup_position: orderedRequirements.length + 1 })}
+            //onClick={() => setWizard({ ...WIZARD_INITIAL, step: 1, lineup_position: orderedRequirements.length + 1 })}
+            onClick={() => submitDefault()} 
             className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-transparent py-5 text-sm font-medium text-muted-foreground transition-all hover:border-foreground/30 hover:bg-muted/20 hover:text-foreground"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-50 group-hover:opacity-100 transition-opacity"><path d="M12 5v14"/><path d="M5 12h14"/></svg>

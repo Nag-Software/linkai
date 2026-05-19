@@ -6,15 +6,27 @@ import { AdminHeader } from '@/components/admin/admin-header'
 import { ToastActionForm } from '@/components/toast-action-form'
 import { DeleteButton } from '@/components/admin/delete-button'
 import {
+  deleteMarketingDesignAction,
   deleteShowAction,
   generatePosterAction,
+  selectMarketingDesignAction,
   updateShowDetailsAction,
+  uploadMarketingDesignAction,
 } from '../actions'
 import { RequirementsTab } from './requirements-tab'
 import { LineupTab } from './lineup-tab'
-import type { RequirementCompensationType, RequirementEnergy, RequirementGender } from '@/types/database'
+import { MarketingTemplateUploadButton } from './marketing-template-upload-button'
+import { PosterGenerateButton } from './poster-generate-button'
+import { artistMatchesRole } from '@/lib/artist-roles'
+import type { RequirementCompensationType, RequirementEnergy, RequirementGender, ShowMarketingDesign } from '@/types/database'
 
-type ShowTab = 'overview' | 'requirements' | 'lineup' | 'marketing' | 'tickets'
+type ShowTab = 'overview' | 'lineup' | 'marketing' | 'tickets'
+
+function formatFileSize(bytes: number | null) {
+  if (!bytes) return null
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
 
 export default async function ShowDetailPage({
   params,
@@ -28,6 +40,7 @@ export default async function ShowDetailPage({
   const db = createAdminClient()
   const shouldLoadTickets = tab === 'tickets'
   const shouldLoadMarketingTasks = tab === 'marketing'
+  const shouldLoadMarketingDesigns = tab === 'marketing'
   const shouldLoadRelatedArtists = tab === 'lineup' || tab === 'marketing'
   const shouldLoadSelectableArtists = tab === 'lineup'
 
@@ -38,6 +51,7 @@ export default async function ShowDetailPage({
     { data: lineup },
     { data: tickets },
     { data: marketingTasks },
+    { data: marketingDesigns },
   ] = await Promise.all([
     db.from('shows').select('*').eq('id', id).single(),
     db.from('show_requirements').select('*').eq('show_id', id).order('lineup_position').order('created_at'),
@@ -49,6 +63,9 @@ export default async function ShowDetailPage({
     shouldLoadMarketingTasks
       ? db.from('marketing_tasks').select('*').eq('show_id', id).order('created_at')
       : Promise.resolve({ data: [] as Array<{ id: string; show_id: string; task_key: string; label: string | null; is_completed: boolean; created_at: string }> }),
+    shouldLoadMarketingDesigns
+      ? db.from('show_marketing_designs').select('*').eq('show_id', id).order('created_at', { ascending: false })
+      : Promise.resolve({ data: [] as ShowMarketingDesign[] }),
   ])
 
   if (!show) notFound()
@@ -58,17 +75,21 @@ export default async function ShowDetailPage({
   const lineupArtistIds = [...new Set((lineup ?? []).map(s => s.artist_id))]
   const allArtistIds = [...new Set([...offerArtistIds, ...lineupArtistIds])]
 
-  const [{ data: artistRows }, { data: selectableArtists }] = await Promise.all([
+  const [{ data: artistRows }, { data: selectableArtists }, { data: bookingExclusions }] = await Promise.all([
     shouldLoadRelatedArtists && allArtistIds.length
       ? db.from('artists').select('id, full_name, stage_name, email, profile_image_url, admin_score, admin_energy_level').in('id', allArtistIds)
       : Promise.resolve({ data: [] as Array<{ id: string; full_name: string; stage_name: string | null; email: string; profile_image_url: string | null; admin_score: number | null; admin_energy_level: string | null }> }),
     shouldLoadSelectableArtists
       ? db.from('artists')
-        .select('id, full_name, stage_name, email, admin_score, admin_energy_level')
+        .select('id, full_name, stage_name, email, admin_score, admin_energy_level, gender, category')
         .eq('status', 'approved')
+        .eq('is_flagged', false)
         .order('full_name')
         .limit(250)
-      : Promise.resolve({ data: [] as Array<{ id: string; full_name: string; stage_name: string | null; email: string; admin_score: number | null; admin_energy_level: string | null }> }),
+      : Promise.resolve({ data: [] as Array<{ id: string; full_name: string; stage_name: string | null; email: string; admin_score: number | null; admin_energy_level: string | null; gender: string | null; category: string[] | null }> }),
+    shouldLoadSelectableArtists
+      ? db.from('show_artist_booking_exclusions').select('artist_id').eq('show_id', id)
+      : Promise.resolve({ data: [] as Array<{ artist_id: string }> }),
   ])
   const artistMap = Object.fromEntries((artistRows ?? []).map(a => [a.id, a]))
 
@@ -83,6 +104,30 @@ export default async function ShowDetailPage({
   const totalSlots = reqFillStatus.reduce((s, r) => s + r.quantity, 0)
   const totalFilled = reqFillStatus.reduce((s, r) => s + Math.min(r.filled, r.quantity), 0)
   const activeArtistIds = new Set(activeLineup.map(spot => spot.artist_id))
+  const activeOfferArtistIds = new Set((offers ?? []).filter(o => ['sent', 'accepted'].includes(o.status)).map(o => o.artist_id))
+  const excludedArtistIds = new Set((bookingExclusions ?? []).map(row => row.artist_id))
+  const unavailableArtistIds = new Set([...activeArtistIds, ...activeOfferArtistIds, ...excludedArtistIds])
+  const bookingCandidates = (selectableArtists ?? []).filter(artist => !unavailableArtistIds.has(artist.id))
+  const energyRelaxationSuggestions = Object.fromEntries(
+    (requirements ?? []).flatMap((requirement) => {
+      const status = reqFillStatus.find((row) => row.id === requirement.id)
+      if (!status || status.isFull || status.pendingOffers > 0 || requirement.energy_level === 'any') return []
+
+      const minScore = Math.max(requirement.min_score ?? 6, 6)
+      const baseMatches = bookingCandidates.filter((artist) => {
+        if (!artistMatchesRole(requirement.role_name, artist)) return false
+        if ((artist.admin_score ?? 0) < minScore) return false
+        if (requirement.required_gender && requirement.required_gender !== 'any' && artist.gender !== requirement.required_gender) return false
+        return true
+      })
+      const strictCount = baseMatches.filter((artist) => artist.admin_energy_level === requirement.energy_level).length
+      const anyEnergyCount = baseMatches.length
+
+      return strictCount === 0
+        ? [[requirement.id, { candidates: anyEnergyCount }]]
+        : []
+    })
+  )
 
   const offerStats = {
     total: (offers ?? []).length,
@@ -93,7 +138,6 @@ export default async function ShowDetailPage({
 
   const TABS: { key: ShowTab; label: string; badge?: number }[] = [
     { key: 'overview', label: 'Oversikt' },
-    { key: 'requirements', label: 'Krav' },
     { key: 'lineup', label: 'Lineup', badge: (offerStats.sent || activeLineup.length) ? Math.max(offerStats.sent, activeLineup.length) : undefined },
     { key: 'marketing', label: 'Markedsføring' },
     { key: 'tickets', label: 'Billetter' },
@@ -124,11 +168,12 @@ export default async function ShowDetailPage({
   }
 
   const SHOW_STATUS_LABELS: Record<string, string> = {
-    draft: 'Utkast', booking: 'Booker', fullbooked: 'Lineup klar',
+    draft: 'Planlegger', booking: 'Booker', fullbooked: 'Lineup klar',
     published: 'Publisert', completed: 'Gjennomført', cancelled: 'Kansellert',
   }
 
   const showLocation = show.venue_address ?? show.venue_name
+  const selectedMarketingDesign = (marketingDesigns ?? []).find((design) => design.id === show.selected_marketing_design_id) ?? (marketingDesigns ?? [])[0] ?? null
 
   return (
     <div>
@@ -229,7 +274,7 @@ export default async function ShowDetailPage({
                 <h2 className="font-semibold text-sm">Automatikk</h2>
                 <div className="space-y-2">
                   {show.status === 'draft' && (requirements ?? []).length === 0 && (
-                    <Link href={`/admin-app/shows/${id}?tab=requirements`} className="block w-full text-center text-sm px-3 py-2 rounded-md border border-dashed text-muted-foreground hover:text-foreground transition-colors">
+                    <Link href={`/admin-app/shows/${id}?tab=lineup`} className="block w-full text-center text-sm px-3 py-2 rounded-md border border-dashed text-muted-foreground hover:text-foreground transition-colors">
                       + Legg til krav først
                     </Link>
                   )}
@@ -308,12 +353,9 @@ export default async function ShowDetailPage({
               <div className="rounded-xl border bg-card p-5 space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="font-semibold text-sm">Plakat</h2>
-                  <ToastActionForm action={generatePosterAction} successMessage="Plakatgenerering er startet.">
-                    <input type="hidden" name="show_id" value={show.id} />
-                    <button type="submit" className="rounded-md border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted">
-                      Regenerer
-                    </button>
-                  </ToastActionForm>
+                  <PosterGenerateButton showId={show.id} posterUrl={show.poster_url} action={generatePosterAction}>
+                    Regenerer
+                  </PosterGenerateButton>
                 </div>
                 <div className="relative aspect-[3/4] w-full overflow-hidden rounded-lg border bg-muted/20">
                   <Image src={show.poster_url} alt={`Plakat for ${show.title}`} fill sizes="(max-width: 768px) 92vw, 50vw" className="object-contain" />
@@ -323,114 +365,177 @@ export default async function ShowDetailPage({
           </div>
         )}
 
-        {/* ══════════════════ REQUIREMENTS ══════════════════ */}
-        {tab === 'requirements' && (
-          <RequirementsTab
-            key={(requirements ?? []).map((r) => [
-              r.id,
-              r.lineup_position,
-              r.role_name,
-              r.min_score ?? '',
-              r.energy_level,
-              r.required_gender ?? 'any',
-              r.compensation_type ?? '',
-              r.compensation_amount ?? '',
-              r.compensation_percent ?? '',
-            ].join(':')).join('|')}
-            showId={show.id}
-            showStatus={show.status}
-            showCurrency={show.currency}
-            requirements={(requirements ?? []).map((r) => ({
-              id: r.id,
-              lineup_position: r.lineup_position,
-              role_name: r.role_name,
-              min_score: r.min_score ?? null,
-              energy_level: r.energy_level as RequirementEnergy,
-              required_gender: (r.required_gender ?? 'any') as RequirementGender,
-              compensation_type: (r.compensation_type ?? null) as RequirementCompensationType | null,
-              compensation_amount: r.compensation_amount ?? null,
-              compensation_percent: r.compensation_percent ?? null,
-            }))}
-          />
-        )}
-
         {/* ══════════════════ LINEUP ══════════════════ */}
         {tab === 'lineup' && (
-          <LineupTab
-            showId={show.id}
-            showStatus={show.status}
-            showCurrency={show.currency}
-            requirements={(requirements ?? []).map(r => ({
-              id: r.id,
-              role_name: r.role_name,
-              quantity: r.quantity,
-              lineup_position: r.lineup_position,
-            }))}
-            confirmedSpots={(lineup ?? []).map(s => ({
-              id: s.id,
-              artist_id: s.artist_id,
-              show_requirement_id: s.show_requirement_id,
-              status: s.status,
-              fee_amount: s.fee_amount ?? null,
-              currency: s.currency ?? null,
-            }))}
-            allOffers={(offers ?? []).map(o => ({
-              id: o.id,
-              artist_id: o.artist_id,
-              show_requirement_id: o.show_requirement_id ?? null,
-              status: o.status,
-              sent_at: o.sent_at ?? null,
-            }))}
-            artistMap={artistMap as Record<string, { id: string; full_name: string; stage_name: string | null; email: string; profile_image_url: string | null; admin_score: number | null; admin_energy_level: string | null }>}
-            selectableArtists={(selectableArtists ?? []).filter(a => !activeArtistIds.has(a.id))}
-            allSlotsFilled={allSlotsFilled}
-          />
+          show.status === 'draft'
+            ? <RequirementsTab
+                key={(requirements ?? []).map((r) => [
+                  r.id,
+                  r.lineup_position,
+                  r.role_name,
+                  r.min_score ?? '',
+                  r.energy_level,
+                  r.required_gender ?? 'any',
+                  r.compensation_type ?? '',
+                  r.compensation_amount ?? '',
+                  r.compensation_percent ?? '',
+                ].join(':')).join('|')}
+                showId={show.id}
+                showStatus={show.status}
+                showCurrency={show.currency}
+                requirements={(requirements ?? []).map((r) => ({
+                  id: r.id,
+                  lineup_position: r.lineup_position,
+                  role_name: r.role_name,
+                  min_score: r.min_score ?? null,
+                  energy_level: r.energy_level as RequirementEnergy,
+                  required_gender: (r.required_gender ?? 'any') as RequirementGender,
+                  compensation_type: (r.compensation_type ?? null) as RequirementCompensationType | null,
+                  compensation_amount: r.compensation_amount ?? null,
+                  compensation_percent: r.compensation_percent ?? null,
+                }))}
+              />
+            : <LineupTab
+                showId={show.id}
+                showStatus={show.status}
+                showCurrency={show.currency}
+                requirements={(requirements ?? []).map(r => ({
+                  id: r.id,
+                  role_name: r.role_name,
+                  quantity: r.quantity,
+                  lineup_position: r.lineup_position,
+                  min_score: r.min_score ?? null,
+                  energy_level: r.energy_level as RequirementEnergy,
+                  required_gender: (r.required_gender ?? 'any') as RequirementGender,
+                  compensation_type: (r.compensation_type ?? null) as RequirementCompensationType | null,
+                  compensation_amount: r.compensation_amount ?? null,
+                  compensation_percent: r.compensation_percent ?? null,
+                }))}
+                confirmedSpots={(lineup ?? []).map(s => ({
+                  id: s.id,
+                  artist_id: s.artist_id,
+                  show_requirement_id: s.show_requirement_id,
+                  status: s.status,
+                  fee_amount: s.fee_amount ?? null,
+                  currency: s.currency ?? null,
+                }))}
+                allOffers={(offers ?? []).map(o => ({
+                  id: o.id,
+                  artist_id: o.artist_id,
+                  show_requirement_id: o.show_requirement_id ?? null,
+                  status: o.status,
+                  sent_at: o.sent_at ?? null,
+                }))}
+                artistMap={artistMap as Record<string, { id: string; full_name: string; stage_name: string | null; email: string; profile_image_url: string | null; admin_score: number | null; admin_energy_level: string | null }>}
+                selectableArtists={(selectableArtists ?? []).filter(a => !activeArtistIds.has(a.id) && !excludedArtistIds.has(a.id))}
+                energyRelaxationSuggestions={energyRelaxationSuggestions}
+                allSlotsFilled={allSlotsFilled}
+              />
         )}
 
         {/* ══════════════════ MARKETING ══════════════════ */}
         {tab === 'marketing' && (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_400px] gap-7 items-start">
               <div className="rounded-xl border bg-card p-5 space-y-3">
                 <div className="flex items-center justify-between">
-                  <h2 className="font-semibold text-sm">Lineup-plakat</h2>
-                  <ToastActionForm action={generatePosterAction} successMessage="Plakatgenerering er startet.">
-                    <input type="hidden" name="show_id" value={show.id} />
-                    <button type="submit" className="rounded-md border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted">
-                      {show.poster_url ? 'Regenerer' : 'Generer'}
-                    </button>
-                  </ToastActionForm>
+                  <div>
+                    <h2 className="font-semibold text-sm">Lineup-plakat</h2>
+                    {selectedMarketingDesign && (
+                      <p className="mt-0.5 text-xs text-muted-foreground">Bruker {selectedMarketingDesign.label || selectedMarketingDesign.file_name}</p>
+                    )}
+                  </div>
+                  <PosterGenerateButton showId={show.id} posterUrl={show.poster_url} action={generatePosterAction}>
+                    {show.poster_url ? 'Regenerer' : 'Generer'}
+                  </PosterGenerateButton>
                 </div>
                 {show.poster_url ? (
                   <div className="space-y-2">
-                    <div className="relative aspect-[3/4] w-full overflow-hidden rounded-lg border bg-muted/20">
-                      <Image src={show.poster_url} alt={`Plakat for ${show.title}`} fill sizes="(max-width: 1024px) 92vw, 45vw" className="object-contain" />
+                    <div className="relative mx-auto aspect-[2/3] w-full max-w-[520px] overflow-hidden rounded-lg border bg-muted/20">
+                      <Image src={show.poster_url} alt={`Plakat for ${show.title}`} fill sizes="(max-width: 768px) 92vw, 520px" className="object-contain" />
                     </div>
                     <a href={show.poster_url} target="_blank" rel="noreferrer" className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline block">
                       Åpne i ny fane
                     </a>
                   </div>
                 ) : (
-                  <div className="flex aspect-[3/4] items-center justify-center rounded-lg border border-dashed bg-muted/30 text-sm text-muted-foreground">
+                  <div className="mx-auto flex aspect-[2/3] w-full max-w-[520px] items-center justify-center rounded-lg border border-dashed bg-muted/30 text-sm text-muted-foreground">
                     {show.status === 'draft' ? 'Plakat genereres når lineup er bekreftet.' : 'Ingen plakat generert ennå.'}
                   </div>
                 )}
               </div>
 
-              {(marketingTasks ?? []).length > 0 && (
-                <div className="rounded-xl border bg-card divide-y">
-                  <div className="px-4 py-2.5 font-semibold text-sm border-b bg-muted/20">Sjekkliste</div>
-                  {(marketingTasks ?? []).map((task) => (
-                    <div key={task.id} className="flex items-center gap-3 px-4 py-3">
-                      <div className={`size-5 rounded border-2 shrink-0 flex items-center justify-center text-[10px] ${task.is_completed ? 'bg-primary border-primary text-primary-foreground' : 'border-input'}`}>
-                        {task.is_completed && '✓'}
-                      </div>
-                      <span className={`text-sm ${task.is_completed ? 'line-through text-muted-foreground' : ''}`}>{task.label ?? task.task_key}</span>
-                    </div>
-                  ))}
+              <div className="rounded-xl border bg-card p-5 min-h-[640px] flex flex-col gap-4">
+                <div className="space-y-1">
+                  <h2 className="font-semibold text-sm">Plakat templates</h2>
+                  <p className="text-xs text-muted-foreground">Design AI-en skal jobbe ut fra.</p>
                 </div>
-              )}
+
+                <div className="flex-1 space-y-3">
+                  {(marketingDesigns ?? []).length > 0 ? (
+                    (marketingDesigns ?? []).map((design) => {
+                      const isSelected = design.id === selectedMarketingDesign?.id
+                      const fileSize = formatFileSize(design.file_size)
+
+                      return (
+                        <div key={design.id} className={`rounded-lg border p-2 transition-colors ${isSelected ? 'border-primary bg-primary/5' : 'bg-background hover:bg-muted/30'}`}>
+                          <ToastActionForm action={selectMarketingDesignAction} successMessage="Template valgt.">
+                            <input type="hidden" name="show_id" value={show.id} />
+                            <input type="hidden" name="design_id" value={design.id} />
+                            <button type="submit" className="block w-full text-left">
+                              <div className="flex items-center justify-between gap-2 pb-2">
+                                <div className="min-w-0">
+                                  <p className="truncate text-xs font-semibold">{design.label || design.file_name}</p>
+                                  <p className="text-[11px] text-muted-foreground uppercase">{design.file_type}{fileSize ? ` · ${fileSize}` : ''}</p>
+                                </div>
+                                {isSelected && (
+                                  <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-primary-foreground">Valgt</span>
+                                )}
+                              </div>
+                              <div className="relative aspect-[3/4] overflow-hidden rounded-md border bg-muted/20">
+                                <Image src={design.file_url} alt={design.label || design.file_name} fill sizes="260px" className="object-contain" />
+                              </div>
+                            </button>
+                          </ToastActionForm>
+                          <div className="mt-2 flex items-center justify-between gap-2">
+                            <a href={design.file_url} target="_blank" rel="noreferrer" className="text-[11px] text-muted-foreground hover:text-foreground underline-offset-2 hover:underline">
+                              Åpne fil
+                            </a>
+                            <ToastActionForm action={deleteMarketingDesignAction} successMessage="Template slettet.">
+                              <input type="hidden" name="show_id" value={show.id} />
+                              <input type="hidden" name="design_id" value={design.id} />
+                              <button type="submit" className="rounded-md px-2 py-1 text-[11px] text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
+                                Slett
+                              </button>
+                            </ToastActionForm>
+                          </div>
+                        </div>
+                      )
+                    })
+                  ) : (
+                    <div className="flex aspect-[3/4] items-center justify-center rounded-lg border border-dashed bg-muted/20 px-4 text-center text-sm text-muted-foreground">
+                      Ingen templates lagt til.
+                    </div>
+                  )}
+                </div>
+
+                <MarketingTemplateUploadButton showId={show.id} action={uploadMarketingDesignAction} />
+              </div>
             </div>
+
+            {(marketingTasks ?? []).length > 0 && (
+              <div className="rounded-xl border bg-card divide-y">
+                <div className="px-4 py-2.5 font-semibold text-sm border-b bg-muted/20">Sjekkliste</div>
+                {(marketingTasks ?? []).map((task) => (
+                  <div key={task.id} className="flex items-center gap-3 px-4 py-3">
+                    <div className={`size-5 rounded border-2 shrink-0 flex items-center justify-center text-[10px] ${task.is_completed ? 'bg-primary border-primary text-primary-foreground' : 'border-input'}`}>
+                      {task.is_completed && '✓'}
+                    </div>
+                    <span className={`text-sm ${task.is_completed ? 'line-through text-muted-foreground' : ''}`}>{task.label ?? task.task_key}</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div className="rounded-xl border bg-card p-5 space-y-2">

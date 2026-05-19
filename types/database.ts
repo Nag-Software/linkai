@@ -22,6 +22,7 @@ export type MarketingTaskKey =
   | 'share_facebook_groups'
   | 'send_calendar_partners'
   | 'schedule_email'
+export type MarketingDesignFileType = 'image'
 
 // ─────────────────────────────────────────────────────────────
 // Row types
@@ -53,7 +54,6 @@ export type Artist = {
   status: ArtistStatus
   admin_score: number | null
   admin_energy_level: EnergyLevel | null
-  admin_type: ArtistType[] | null
   admin_notes: string | null
   is_flagged: boolean
   flag_reason: string | null
@@ -84,11 +84,26 @@ export type Show = {
   currency: string
   ticket_url: string | null
   poster_url: string | null
+  selected_marketing_design_id: string | null
   status: ShowStatus
   stripe_product_id: string | null
   stripe_price_id: string | null
   is_template: boolean
   published_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type ShowMarketingDesign = {
+  id: string
+  show_id: string
+  label: string | null
+  file_url: string
+  file_path: string
+  file_name: string
+  mime_type: string
+  file_type: MarketingDesignFileType
+  file_size: number | null
   created_at: string
   updated_at: string
 }
@@ -202,6 +217,26 @@ export type MarketingTask = {
   updated_at: string
 }
 
+export type BookingScoringConfig = {
+  id: string
+  quality_weight: number
+  availability_bonus: number
+  role_match_bonus: number
+  busy_penalty_per_booking: number
+  busy_window_days: number
+  offers_per_slot: number
+  fallback_limit: number
+  updated_at: string
+}
+
+export type ShowArtistBookingExclusion = {
+  id: string
+  show_id: string
+  artist_id: string
+  reason: string | null
+  created_at: string
+}
+
 // ─────────────────────────────────────────────────────────────
 // Supabase Database generic type (supabase-js v2 format)
 // Fields with DB defaults are optional in Insert, all optional in Update.
@@ -238,7 +273,6 @@ export type Database = {
           language?: string | null
           gender?: ArtistGender | null
           social_links?: Record<string, string> | null
-          admin_type?: ArtistType[] | null
           status?: ArtistStatus
           admin_score?: number | null
           admin_energy_level?: EnergyLevel | null
@@ -280,14 +314,34 @@ export type Database = {
           currency?: string
           ticket_url?: string | null
           poster_url?: string | null
+          selected_marketing_design_id?: string | null
           status?: ShowStatus
           stripe_product_id?: string | null
           stripe_price_id?: string | null
+          is_template?: boolean
           published_at?: string | null
           created_at?: string
           updated_at?: string
         }
         Update: Partial<Show>
+        Relationships: []
+      }
+      show_marketing_designs: {
+        Row: ShowMarketingDesign
+        Insert: {
+          id?: string
+          show_id: string
+          label?: string | null
+          file_url: string
+          file_path: string
+          file_name: string
+          mime_type: string
+          file_type: MarketingDesignFileType
+          file_size?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<ShowMarketingDesign>
         Relationships: []
       }
       show_requirements: {
@@ -429,6 +483,34 @@ export type Database = {
           updated_at?: string
         }
         Update: Partial<MarketingTask>
+        Relationships: []
+      }
+      booking_scoring_config: {
+        Row: BookingScoringConfig
+        Insert: {
+          id?: string
+          quality_weight?: number
+          availability_bonus?: number
+          role_match_bonus?: number
+          busy_penalty_per_booking?: number
+          busy_window_days?: number
+          offers_per_slot?: number
+          fallback_limit?: number
+          updated_at?: string
+        }
+        Update: Partial<Omit<BookingScoringConfig, 'id'>>
+        Relationships: []
+      }
+      show_artist_booking_exclusions: {
+        Row: ShowArtistBookingExclusion
+        Insert: {
+          id?: string
+          show_id: string
+          artist_id: string
+          reason?: string | null
+          created_at?: string
+        }
+        Update: Partial<ShowArtistBookingExclusion>
         Relationships: []
       }
     }

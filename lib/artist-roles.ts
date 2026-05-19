@@ -109,15 +109,12 @@ export function canonicalRoleLabel(value: string | null | undefined) {
 
 export function artistMatchesRole(
   roleName: string | null | undefined,
-  artist: { admin_type?: string[] | null; category?: string | string[] | null }
+  artist: { category?: string | string[] | null }
 ) {
   const normalizedRole = normalizeArtistRole(roleName)
   if (!normalizedRole) return false
 
-  const artistRoles = [
-    ...normalizeArtistRoleList(artist.admin_type ?? []),
-    ...normalizeArtistRoleList(artist.category),
-  ]
+  const artistRoles = normalizeArtistRoleList(artist.category)
 
   return artistRoles.includes(normalizedRole)
 }

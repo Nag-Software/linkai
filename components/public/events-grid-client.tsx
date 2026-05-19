@@ -86,7 +86,7 @@ export function EventsGridClient({ shows, userCountry = 'kvelder' }: Props) {
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={date} onSelect={setDate} locale={nb} />
+                <Calendar mode="single" onSelect={setDate} locale={nb} />
               </PopoverContent>
             </Popover>
           </div>

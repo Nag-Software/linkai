@@ -1,0 +1,132 @@
+
+> humor-events@0.1.0 lint /Users/casper/Desktop/Nag-Software/humor.events
+> eslint
+
+
+/Users/casper/Desktop/Nag-Software/humor.events/app/admin-app/scanner/[showId]/scanner-client.tsx
+  151:7  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/casper/Desktop/Nag-Software/humor.events/app/admin-app/scanner/[showId]/scanner-client.tsx:151:7
+  149 |   useEffect(() => {
+  150 |     if (activeTab === 'scan') {
+> 151 |       startCamera()
+      |       ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  152 |     } else {
+  153 |       stopCamera()
+  154 |     }  react-hooks/set-state-in-effect
+
+/Users/casper/Desktop/Nag-Software/humor.events/app/admin-app/shows/[id]/requirements-tab.tsx
+  392:5   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/casper/Desktop/Nag-Software/humor.events/app/admin-app/shows/[id]/requirements-tab.tsx:392:5
+  390 |     }
+  391 |
+> 392 |     setReqStates(mergedStates)
+      |     ^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  393 |     setDirtyIds(new Set(Object.keys(validDrafts)))
+  394 |
+  395 |     for (const [id, state] of Object.entries(validDrafts)) {                                                                                                                                                                                                                                                    react-hooks/set-state-in-effect
+  400:11  error    Error: Cannot access variable before it is declared
+
+`persistReq` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+/Users/casper/Desktop/Nag-Software/humor.events/app/admin-app/shows/[id]/requirements-tab.tsx:400:11
+  398 |         debounceTimers.current[id] = setTimeout(() => {
+  399 |           delete debounceTimers.current[id]
+> 400 |           persistReq(id, state)
+      |           ^^^^^^^^^^ `persistReq` accessed before it is declared
+  401 |         }, 150)
+  402 |       }
+  403 |     }
+
+/Users/casper/Desktop/Nag-Software/humor.events/app/admin-app/shows/[id]/requirements-tab.tsx:418:3
+  416 |   // ── Autosave logic ──────────────────────────────────────────────────────────
+  417 |
+> 418 |   const persistReq = React.useCallback(
+      |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 419 |     (id: string, state: ReqState) => {
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 420 |       setSavingIds((prev) => new Set([...prev, id]))
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 448 |     [showId]
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 449 |   )
+      | ^^^^ `persistReq` is declared here
+  450 |
+  451 |   const scheduleAutosave = React.useCallback(
+  452 |     (id: string, state: ReqState) => {  react-hooks/immutability
+  419:5   error    Compilation Skipped: Existing memoization could not be preserved
+
+React Compiler has skipped optimizing this component because the existing manual memoization could not be preserved. This value was memoized in source but not in compilation output.
+
+/Users/casper/Desktop/Nag-Software/humor.events/app/admin-app/shows/[id]/requirements-tab.tsx:419:5
+  417 |
+  418 |   const persistReq = React.useCallback(
+> 419 |     (id: string, state: ReqState) => {
+      |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 420 |       setSavingIds((prev) => new Set([...prev, id]))
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 421 |       updateRequirementAction(buildFormData(showId, id, state))
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 446 |         })
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 447 |     },
+      | ^^^^^^ Could not preserve existing memoization
+  448 |     [showId]
+  449 |   )
+  450 |                                                                                                                                                                                                                                                                                                                                                                   react-hooks/preserve-manual-memoization
+  624:9   warning  'fixedCount' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+  625:9   warning  'percentCount' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+  626:9   warning  'issueCount' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+  960:10  warning  'StatPill' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+
+/Users/casper/Desktop/Nag-Software/humor.events/app/artists/page.tsx
+  19:9  warning  'highEnergy' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  20:9  warning  'languages' is assigned a value but never used   @typescript-eslint/no-unused-vars
+
+/Users/casper/Desktop/Nag-Software/humor.events/app/page.tsx
+  3:10  warning  'EventsCarouselClient' is defined but never used  @typescript-eslint/no-unused-vars
+  8:8   warning  'Link' is defined but never used                  @typescript-eslint/no-unused-vars
+
+/Users/casper/Desktop/Nag-Software/humor.events/components/admin/admin-sidebar.tsx
+  13:3   warning  'Music2' is defined but never used                @typescript-eslint/no-unused-vars
+  26:10  warning  'MusicNote01FreeIcons' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/casper/Desktop/Nag-Software/humor.events/components/admin/editable-artist-profile.tsx
+  93:6  warning  React Hook useEffect has a missing dependency: 'save'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/casper/Desktop/Nag-Software/humor.events/components/public/events-grid-client.tsx
+  48:21  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/casper/Desktop/Nag-Software/humor.events/components/public/events-grid-client.tsx:48:21
+  46 |         )
+  47 |       })
+> 48 |       if (hasToday) setDate(today)
+     |                     ^^^^^^^ Avoid calling setState() directly within an effect
+  49 |       setInitialSet(true)
+  50 |     }
+  51 |   }, [shows, initialSet])  react-hooks/set-state-in-effect
+
+✖ 16 problems (5 errors, 11 warnings)
+
+ ELIFECYCLE  Command failed with exit code 1.

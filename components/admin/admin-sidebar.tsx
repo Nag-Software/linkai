@@ -4,13 +4,11 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import {
-  LayoutDashboard,
   Users,
   CalendarDays,
   ShoppingCart,
   Settings,
   LogOut,
-  Music2,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -23,12 +21,10 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
-import { MusicNote01FreeIcons } from '@hugeicons/core-free-icons'
 
 const navItems = [
-  { label: 'Dashboard', href: '/', icon: LayoutDashboard, exact: true },
-  { label: 'Komikere', href: '/artists', icon: Users },
   { label: 'Shows', href: '/shows', icon: CalendarDays },
+  { label: 'Komikere', href: '/artists', icon: Users },
   { label: 'Orders', href: '/orders', icon: ShoppingCart },
   { label: 'Settings', href: '/settings', icon: Settings },
 ]
@@ -48,7 +44,7 @@ export function AdminSidebar({ user }: AdminSidebarProps) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <Link href={pathPrefix}>
+              <Link href={`${pathPrefix}/shows`}>
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                   <Image src="/favicon.svg" className="rounded-full p-0 outline-2 border-1" alt="" width={32} height={32} />
                 </div>
@@ -67,10 +63,8 @@ export function AdminSidebar({ user }: AdminSidebarProps) {
           <SidebarGroupLabel>Navigasjon</SidebarGroupLabel>
           <SidebarMenu>
             {navItems.map((item) => {
-              const active = item.exact
-                ? pathname === item.href || pathname === '/'
-                : pathname.startsWith(item.href)
-              const href = item.href === '/' ? pathPrefix : `${pathPrefix}${item.href}`
+              const active = pathname.startsWith(item.href)
+              const href = `${pathPrefix}${item.href}`
               return (
                 <SidebarMenuItem key={item.href + item.label}>
                   <SidebarMenuButton asChild isActive={active} tooltip={item.label}>

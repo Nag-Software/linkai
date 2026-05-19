@@ -3,8 +3,7 @@ import { ToastActionForm } from '@/components/toast-action-form'
 import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { cloneShowAction, createShowAction } from '../actions'
-import { ARTIST_ROLE_LABEL_OPTIONS, canonicalRoleLabel } from '@/lib/artist-roles'
-import type { ShowRequirement } from '@/types/database'
+
 
 export default async function NewShowPage({
   searchParams,
@@ -15,10 +14,7 @@ export default async function NewShowPage({
 
   if (from) {
     const db = createAdminClient()
-    const [{ data: template }, { data: requirements }] = await Promise.all([
-      db.from('shows').select('*').eq('id', from).single(),
-      db.from('show_requirements').select('*').eq('show_id', from).order('lineup_position').order('created_at'),
-    ])
+    const { data: template } = await db.from('shows').select('*').eq('id', from).single()
 
     if (template) {
       return (
@@ -68,26 +64,6 @@ export default async function NewShowPage({
                     </select>
                   </div>
                 </div>
-              </div>
-
-              {/* Requirements / lineup */}
-              <div className="rounded-2xl border bg-card p-5 shadow-sm md:p-6">
-                <div className="mb-5 flex items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <h2 className="font-semibold text-sm">Line-up krav</h2>
-                    <p className="text-sm text-muted-foreground">Eksisterende roller fra malen blir med videre og kan finjusteres senere.</p>
-                  </div>
-                  <span className="text-xs text-muted-foreground">{requirements?.length ?? 0} roller</span>
-                </div>
-                {(requirements ?? []).length > 0 ? (
-                  <div className="space-y-3">
-                    {(requirements as ShowRequirement[]).map((req, i) => (
-                      <RequirementRow key={req.id} req={req} index={i} />
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Ingen krav definert på malen.</p>
-                )}
               </div>
 
               <button type="submit"
@@ -181,57 +157,6 @@ export default async function NewShowPage({
             </div>
           </div>
         )}
-      </div>
-    </div>
-  )
-}
-
-function RequirementRow({ req, index }: { req: ShowRequirement; index: number }) {
-  const prefix = `req_${index}`
-  return (
-    <div className="grid grid-cols-1 items-end gap-3 rounded-xl border bg-muted/20 p-4 md:grid-cols-6">
-      <input type="hidden" name={`${prefix}_id`} value={req.id} />
-      <input type="hidden" name={`${prefix}_lineup_position`} value={req.lineup_position} />
-      <input type="hidden" name={`${prefix}_compensation_type`} value={req.compensation_type ?? ''} />
-      <input type="hidden" name={`${prefix}_compensation_amount`} value={req.compensation_amount != null ? String(req.compensation_amount / 100) : ''} />
-      <input type="hidden" name={`${prefix}_compensation_percent`} value={req.compensation_percent != null ? String(req.compensation_percent) : ''} />
-      <div className="space-y-1.5 md:col-span-2">
-        <label className="text-xs font-medium text-muted-foreground">Rolle</label>
-        <select name={`${prefix}_role_name`} defaultValue={canonicalRoleLabel(req.role_name) ?? ARTIST_ROLE_LABEL_OPTIONS[0]}
-          className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-          {ARTIST_ROLE_LABEL_OPTIONS.map((role) => (
-            <option key={role} value={role}>{role}</option>
-          ))}
-        </select>
-      </div>
-      <div className="space-y-1.5">
-        <label className="text-xs font-medium text-muted-foreground">Antall</label>
-        <input name={`${prefix}_quantity`} type="number" min={1} defaultValue={req.quantity}
-          className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
-      </div>
-      <div className="space-y-1.5">
-        <label className="text-xs font-medium text-muted-foreground">Energi</label>
-        <select name={`${prefix}_energy_level`} defaultValue={req.energy_level}
-          className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-          <option value="any">Alle</option>
-          <option value="high">Høy</option>
-          <option value="low">Lav</option>
-          <option value="uncertain">Usikker</option>
-        </select>
-      </div>
-      <div className="space-y-1.5">
-        <label className="text-xs font-medium text-muted-foreground">Score</label>
-        <input name={`${prefix}_min_score`} type="number" min={1} max={10} defaultValue={req.min_score ?? ''}
-          className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
-      </div>
-      <div className="space-y-1.5">
-        <label className="text-xs font-medium text-muted-foreground">Kjønn</label>
-        <select name={`${prefix}_required_gender`} defaultValue={req.required_gender}
-          className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-          <option value="any">Alle</option>
-          <option value="male">Mann</option>
-          <option value="female">Dame</option>
-        </select>
       </div>
     </div>
   )
